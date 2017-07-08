@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"github.com/cenkalti/backoff"
+	"regexp"
+	"runtime/debug"
 )
 
 // EventStore publish and listen to kafka events
@@ -34,8 +36,19 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	me.producer = newProducer(brokers)
 }
 
+func validateTopicName(topic string) bool {
+	if len(topic) >= 255 {
+		return false
+	}
+	legalTopic := regexp.MustCompile(`^[a-zA-Z0-9\._\-]+$`)
+	return legalTopic.MatchString(topic)
+}
+
 // Publish job
 func (me *EventStore) Publish(topic string, data interface{}) {
+	if !validateTopicName(topic) {
+		common.Panic(common.NewInternalErr("topic is not valid, %v", topic))
+	}
 	promes, ok := data.(proto.Message)
 	if ok {
 		data = common.Protify(promes)
@@ -91,6 +104,11 @@ func (me *EventStore) Listen(h handler) {
 }
 
 func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consumer {
+	for _, t := range topics {
+		if !validateTopicName(t) {
+			common.Panic(common.NewInternalErr("topic is not valid, %v", t))
+		}
+	}
 	c := cluster.NewConfig()
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
