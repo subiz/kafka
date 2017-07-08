@@ -4,10 +4,10 @@ import (
 	"bitbucket.org/subiz/gocommon"
 	proto "github.com/golang/protobuf/proto"
 	"github.com/Shopify/sarama"
-		cluster "github.com/bsm/sarama-cluster"
+	cluster "github.com/bsm/sarama-cluster"
 	"os"
 	"os/signal"
-	"time"
+	"github.com/cenkalti/backoff"
 )
 
 // EventStore publish and listen to kafka events
@@ -20,12 +20,13 @@ func newProducer(brokers []string) sarama.SyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewRandomPartitioner
 	config.Producer.Return.Successes = true
-//	config.Producer.RequireAcks = sarama.WaitForAll
+	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	common.Panicf(err, "unable to create producer with brokers %v", brokers)
 	return producer
 }
 
+// Connect to kafka brokers
 func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	if len(topics) != 0 {
 		me.consumer = newConsumer(brokers, topics, consumergroup)
@@ -33,7 +34,7 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	me.producer = newProducer(brokers)
 }
 
-// Publish publish job
+// Publish job
 func (me *EventStore) Publish(topic string, data interface{}) {
 	promes, ok := data.(proto.Message)
 	if ok {
@@ -67,10 +68,11 @@ func (me *EventStore) Listen(h handler) {
 	for { select {
 	case msg, more := <-me.consumer.Messages():
 		if !more { break }
-		func() { // don't this function die because of panic
+		func() { // don't allow this function die
 			defer func() {
 				r := recover()
 				if r != nil {
+					debug.PrintStack()
 					common.LogError(r)
 				}
 			}()
@@ -80,9 +82,9 @@ func (me *EventStore) Listen(h handler) {
 	case err, more := <-me.consumer.Errors():
 		if !more { break }
 		common.LogError("%v", err)
-	case ntf, more := <-me.consumer.Notifications():
-		if !more { break }
-		common.Log("Kafka Rebalanced: %+v\n", ntf)
+		//case ntf, more := <-me.consumer.Notifications():
+		//	if !more { break }
+		//common.Log("Kafka Rebalanced: %+v\n", ntf)
 	case <-signals:
 		return
 	}}
@@ -90,19 +92,23 @@ func (me *EventStore) Listen(h handler) {
 
 func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consumer {
 	c := cluster.NewConfig()
-	c.Metadata.Retry.Max = 3
-	c.Metadata.Retry.Backoff = 250 * time.Millisecond
-	//c.Metadata.RefreshFrequency = 10 * time.Minute
-
 	c.Consumer.Return.Errors = true
-	//c.Consumer.Retry.Backoff = 2 * time.Minute
-	//c.Consumer.MaxWaitTime = 2 * time.Minute //250 * time.Millisecond
-	//c.Consumer.MaxProcessingTime = 100 * time.Minute//time.Millisecond
-	//c.Consumer.Offsets.CommitInterval = 1 * time.Minute//time.Second
-	//c.Consumer.Offsets.Initial = OffsetNewest
-	c.Group.Return.Notifications = true
-	common.Log(topics)
-	consumer, err := cluster.NewConsumer(brokers, consumergroup, topics, c)
+	c.Consumer.Offsets.Initial = sarama.OffsetOldest
+	//c.Group.Return.Notifications = true
+	//common.Log(topics)
+
+	ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+	var err error
+	var consumer *cluster.Consumer
+	for range ticker.C {
+		consumer, err = cluster.NewConsumer(brokers, consumergroup, topics, c)
+		if err != nil {
+			common.Log(err, "will retry...")
+			continue
+		}
+		ticker.Stop()
+		break
+	}
 	common.Panicf(err, "unable to create consumer with brokers %v", brokers)
 	return consumer
 }
