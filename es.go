@@ -10,6 +10,8 @@ import (
 	"github.com/cenkalti/backoff"
 	"regexp"
 	"runtime/debug"
+	"encoding/gob"
+	"bytes"
 )
 
 // EventStore publish and listen to kafka events
@@ -18,9 +20,17 @@ type EventStore struct {
 	producer sarama.SyncProducer
 }
 
+// Close clean resource
+func (me *EventStore) Close() {
+	err := me.producer.Close()
+	if err != nil {
+		common.LogError(err)
+	}
+}
+
 func newProducer(brokers []string) sarama.SyncProducer {
 	config := sarama.NewConfig()
-	config.Producer.Partitioner = sarama.NewRandomPartitioner
+	config.Producer.Partitioner = sarama.NewHashPartitioner
 	config.Producer.Return.Successes = true
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
@@ -33,7 +43,6 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	if len(topics) != 0 {
 		me.consumer = newConsumer(brokers, topics, consumergroup)
 	}
-	me.producer = newProducer(brokers)
 }
 
 func validateTopicName(topic string) bool {
@@ -44,27 +53,81 @@ func validateTopicName(topic string) bool {
 	return legalTopic.MatchString(topic)
 }
 
-// Publish job
-func (me *EventStore) Publish(topic string, data interface{}) {
+func encodeGob(str string) []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(str)
+	if err != nil {
+		common.Panic(common.NewInternalErr("%v, unable to encode str %s", err, str))
+	}
+	return  buf.Bytes()
+}
+
+// Publish a event to kafka
+// data could be [value] or [value, key]
+// value must be type of []byte or proto.Message or string
+// string will be encode using encoding/gob
+// key must be type string
+func (me *EventStore) Publish(topic string, data ...interface{}) {
+	var value interface{}
+	var key string
+	var ok bool
+	// convert value from proto.message or string to []byte
+	if len(data) == 0 || data[0] == nil {
+		common.Panic(common.NewInternalErr("value is nil"))
+	} else {
+		promes, ok := data[0].(proto.Message)
+		if ok {
+			value = common.Protify(promes)
+		} else {
+			value, ok = data[0].([]byte)
+			if !ok {
+				valuestr, ok := data[0].(string)
+				if ok {
+					value = encodeGob(valuestr)
+				}
+				common.Panic(common.NewInternalErr("value should be type of proto.Message, []byte or string, got %v", data[0]))
+			}
+		}
+	}
+
+	// read key
+	if len(data) < 1 || data[1] == nil {
+		key = ""
+	} else {
+		key, ok = data[1].(string)
+		if !ok {
+			common.Panic(common.NewInternalErr("key should be type string, got %v", data[1]))
+		}
+	}
+
 	if !validateTopicName(topic) {
-		common.Panic(common.NewInternalErr("topic is not valid, %v", topic))
+		common.Panic(common.NewInternalErr("topic is not valid, %s", topic))
 	}
-	promes, ok := data.(proto.Message)
-	if ok {
-		data = common.Protify(promes)
-	}
-	msg := prepareMessage(topic, data.([]byte))
+
+	msg := prepareMessage(key, topic, value.([]byte))
 	_, _, err := me.producer.SendMessage(msg)
 	if err != nil {
+		// TODO: this is bad, should we panic or retry
 		common.Panic(common.NewInternalErr("%v, unable to send message to kafka, topic: %s, data: %v", err, topic, data))
 	}
 }
 
-func prepareMessage(topic string, message []byte) *sarama.ProducerMessage {
-	msg := &sarama.ProducerMessage{
-		Topic: topic,
-		Partition: -1,
-		Value: sarama.ByteEncoder(message),
+func prepareMessage(key, topic string, message []byte) *sarama.ProducerMessage {
+	var msg *sarama.ProducerMessage
+	if key == "" {
+		msg = &sarama.ProducerMessage{
+			Topic: topic,
+			Partition: -1,
+			Value: sarama.ByteEncoder(message),
+		}
+	} else {
+		msg = &sarama.ProducerMessage{
+			Key: sarama.StringEncoder(key),
+			Topic: topic,
+			Partition: -1,
+			Value: sarama.ByteEncoder(message),
+		}
 	}
 	return msg
 }
