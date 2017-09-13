@@ -9,3 +9,6 @@ Auto topic creation is setted to true, there is no need to set advertised host, 
 
 ### Run it
 `docker run -e "ADVERTISED_PORT=9092" thanhpk/kafka:subiz-dev`
+
+### Git Repo
+`bitbucket.org/subiz/kafka/container`
