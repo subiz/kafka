@@ -1,5 +1,10 @@
 package kafka
 
+import (
+	proto "github.com/golang/protobuf/proto"
+	"bitbucket.org/subiz/gocommon"
+)
+
 type Event struct {
 	Topic string
 	Value string
@@ -7,19 +12,23 @@ type Event struct {
 }
 
 type EventStoreMock struct {
-	MessageChan chan *Event
+	EventChan chan *Event
 }
 
 func (me *EventStoreMock) Config() {
-	me.MessageChan = make(chan *Event)
+	me.EventChan = make(chan *Event)
 }
 
 func (me *EventStoreMock) Publish(topic string, data ...interface{}) {
 	go func() {
-		me.MessageChan <- &Event{
+		partition := ""
+		if len(data) > 2 {
+			partition, _ = data[1].(string)
+		}
+		me.EventChan <- &Event{
 			Topic: topic,
-			Value: data[0].(string),
-			Partition: data[1].(string),
+			Value: string(common.Protify(data[0].(proto.Message))),
+			Partition: partition,
 		}
 	}()
 }
