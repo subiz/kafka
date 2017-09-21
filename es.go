@@ -23,8 +23,10 @@ import (
 type EventStore struct {
 	consumer *cluster.Consumer
 	producer sarama.SyncProducer
+	parproducer sarama.SyncProducer
 	stopchan chan bool
 	cg string
+	brokers []string
 }
 
 // Close clean resource
@@ -37,14 +39,20 @@ func (me *EventStore) Close() {
 	}
 }
 
-func newProducer(brokers []string) sarama.SyncProducer {
+func newProducer(brokers []string) (sarama.SyncProducer, sarama.SyncProducer) {
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewHashPartitioner
 	config.Producer.Return.Successes = true
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
-	common.Panicf(err, "unable to create producer with brokers %v", brokers)
-	return producer
+	common.PanicIfError(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
+
+	parconfig := sarama.NewConfig()
+	parconfig.Producer.Partitioner = sarama.NewManualPartitioner
+	parconfig.Producer.Return.Successes = true
+	parproducer, err := sarama.NewSyncProducer(brokers, config)
+	common.PanicIfError(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
+	return producer, parproducer
 }
 
 // Connect to kafka brokers
@@ -52,9 +60,10 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	if len(topics) != 0 {
 		me.consumer = newConsumer(brokers, topics, consumergroup)
 	}
+	me.brokers = brokers
 	me.cg = consumergroup
 	me.stopchan = make(chan bool)
-	me.producer = newProducer(brokers)
+	me.producer, me.parproducer = newProducer(brokers)
 }
 
 func validateTopicName(topic string) bool {
@@ -73,6 +82,42 @@ func encodeGob(str string) []byte {
 	return  buf.Bytes()
 }
 
+func (me *EventStore) PublishToPartition(topic string, data interface{}, partition int32) (par int32, offset int64) {
+	if !validateTopicName(topic) {
+		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
+	}
+	var value []byte
+	var ok bool
+
+	promes, ok := data.(proto.Message)
+	if ok {
+		value = common.Protify(promes)
+	} else {
+		value, ok = data.([]byte)
+		if !ok {
+			valuestr, ok := data.(string)
+			if !ok {
+				panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
+			}
+			value = []byte(valuestr)//encodeGob(valuestr)
+		}
+	}
+	msg := &sarama.ProducerMessage{
+		Topic: topic,
+		Partition: partition,
+		Value: sarama.ByteEncoder(value),
+	}
+	var err error
+	par, offset, err = me.parproducer.SendMessage(msg)
+	if err != nil {
+		common.Log(nil, topic, data)
+		// TODO: this is bad, should we panic or retry
+		panic(common.New500(lang.T_unable_to_send_message, "%v, topic: %s, data: %v", err, topic, data))
+	}
+	return par, offset
+}
+
+// Publish with context tracing
 func (me *EventStore) PublishT(ctx commonpb.Context, topic string, data ...interface{}) (par int32, offset int64) {
 	return me.Publish(topic, data...)
 }
@@ -86,7 +131,7 @@ func (me *EventStore) Publish(topic string, data ...interface{}) (partition int3
 	if !validateTopicName(topic) {
 		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
 	}
-	var value interface{}
+	var value []byte
 	var key string
 	var ok bool
 	// convert value from proto.message or string to []byte
@@ -118,7 +163,7 @@ func (me *EventStore) Publish(topic string, data ...interface{}) (partition int3
 		}
 	}
 
-	msg := prepareMessage(key, topic, value.([]byte))
+	msg := prepareMessage(key, topic, value)
 	partition, offset, err := me.producer.SendMessage(msg)
 	if err != nil {
 		common.Log(nil, topic, data)
@@ -140,7 +185,7 @@ func prepareMessage(key, topic string, message []byte) *sarama.ProducerMessage {
 		msg = &sarama.ProducerMessage{
 			Key: sarama.StringEncoder(key),
 			Topic: topic,
-			Partition: -1,
+			//Partition: -1,
 			Value: sarama.ByteEncoder(message),
 		}
 	}
