@@ -14,9 +14,9 @@ import (
 	"bytes"
 //	"sync"
 	"time"
-	commonpb "bitbucket.org/subiz/servicespec/proto/common"
+	commonpb "bitbucket.org/subiz/header/common"
 	"fmt"
-	"bitbucket.org/subiz/servicespec/proto/lang"
+	"bitbucket.org/subiz/header/lang"
 )
 
 // EventStore publish and listen to kafka events
@@ -82,12 +82,24 @@ func encodeGob(str string) []byte {
 	return  buf.Bytes()
 }
 
-func (me *EventStore) PublishToPartition(topic string, data interface{}, partition int32) (par int32, offset int64) {
+// Publish with context tracing
+func (me *EventStore) PublishT(ctx commonpb.Context, topic string, data interface{}, key string) (par int32, offset int64) {
+	return me.Publish(topic, data, key)
+}
+
+// Publish a event to kafka
+// data must be type of []byte or proto.Message or string
+// string will be encode using encoding/gob
+func (me *EventStore) Publish(topic string, data interface{}, key string) (partition int32, offset int64) {
 	if !validateTopicName(topic) {
 		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
 	}
 	var value []byte
 	var ok bool
+	// convert value from proto.message or string to []byte
+	if data == nil {
+		panic(common.New500(lang.T_empty, "value is nil"))
+	}
 
 	promes, ok := data.(proto.Message)
 	if ok {
@@ -100,66 +112,6 @@ func (me *EventStore) PublishToPartition(topic string, data interface{}, partiti
 				panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
 			}
 			value = []byte(valuestr)//encodeGob(valuestr)
-		}
-	}
-	msg := &sarama.ProducerMessage{
-		Topic: topic,
-		Partition: partition,
-		Value: sarama.ByteEncoder(value),
-	}
-	var err error
-	par, offset, err = me.parproducer.SendMessage(msg)
-	if err != nil {
-		common.Log(nil, topic, data)
-		// TODO: this is bad, should we panic or retry
-		panic(common.New500(lang.T_unable_to_send_message, "%v, topic: %s, data: %v", err, topic, data))
-	}
-	return par, offset
-}
-
-// Publish with context tracing
-func (me *EventStore) PublishT(ctx commonpb.Context, topic string, data ...interface{}) (par int32, offset int64) {
-	return me.Publish(topic, data...)
-}
-
-// Publish a event to kafka
-// data could be [value] or [value, key]
-// value must be type of []byte or proto.Message or string
-// string will be encode using encoding/gob
-// key must be type string
-func (me *EventStore) Publish(topic string, data ...interface{}) (partition int32, offset int64) {
-	if !validateTopicName(topic) {
-		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
-	}
-	var value []byte
-	var key string
-	var ok bool
-	// convert value from proto.message or string to []byte
-	if len(data) == 0 || data[0] == nil {
-		panic(common.New500(lang.T_empty, "value is nil"))
-	}
-
-	promes, ok := data[0].(proto.Message)
-	if ok {
-		value = common.Protify(promes)
-	} else {
-		value, ok = data[0].([]byte)
-		if !ok {
-			valuestr, ok := data[0].(string)
-			if !ok {
-				panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data[0]))
-			}
-			value = []byte(valuestr)//encodeGob(valuestr)
-		}
-	}
-
-	// read key
-	if len(data) < 2 || data[1] == nil {
-		key = ""
-	} else {
-		key, ok = data[1].(string)
-		if !ok {
-			panic(common.New500(lang.T_wrong_type, "key should be type string, got %v", data[1]))
 		}
 	}
 
@@ -191,9 +143,6 @@ func prepareMessage(key, topic string, message []byte) *sarama.ProducerMessage {
 	}
 	return msg
 }
-
-// Handler ...
-// NotiHandler ...
 
 // Listen start listening kafka consumer
 func (me *EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
@@ -236,7 +185,6 @@ func (me *EventStore) Listen(h func(partition int32, topic string, value []byte,
 		}
 	case err, more := <-me.consumer.Errors():
 		if !more {
-
 			goto end
 		}
 		common.LogError(common.Info{
