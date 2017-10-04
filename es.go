@@ -9,13 +9,8 @@ import (
 	"os/signal"
 	"github.com/cenkalti/backoff"
 	"regexp"
-	"runtime/debug"
-	"encoding/gob"
-	"bytes"
-//	"sync"
 	"time"
 	commonpb "bitbucket.org/subiz/header/common"
-	"fmt"
 	"bitbucket.org/subiz/header/lang"
 )
 
@@ -23,23 +18,18 @@ import (
 type EventStore struct {
 	consumer *cluster.Consumer
 	producer sarama.SyncProducer
-	parproducer sarama.SyncProducer
 	stopchan chan bool
 	cg string
 	brokers []string
 }
 
 // Close clean resource
-func (me *EventStore) Close() {
+func (me EventStore) Close() {
 	err := me.producer.Close()
-	if err != nil {
-		common.LogError(common.Info{
-			"data": err.Error(),
-		})
-	}
+	common.LogErr(err)
 }
 
-func newProducer(brokers []string) (sarama.SyncProducer, sarama.SyncProducer) {
+func newProducer(brokers []string) sarama.SyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewHashPartitioner
 	config.Producer.Return.Successes = true
@@ -47,12 +37,7 @@ func newProducer(brokers []string) (sarama.SyncProducer, sarama.SyncProducer) {
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	common.PanicIfError(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
 
-	parconfig := sarama.NewConfig()
-	parconfig.Producer.Partitioner = sarama.NewManualPartitioner
-	parconfig.Producer.Return.Successes = true
-	parproducer, err := sarama.NewSyncProducer(brokers, config)
-	common.PanicIfError(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
-	return producer, parproducer
+	return producer
 }
 
 // Connect to kafka brokers
@@ -63,7 +48,7 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
 	me.brokers = brokers
 	me.cg = consumergroup
 	me.stopchan = make(chan bool)
-	me.producer, me.parproducer = newProducer(brokers)
+	me.producer = newProducer(brokers)
 }
 
 func validateTopicName(topic string) bool {
@@ -74,49 +59,38 @@ func validateTopicName(topic string) bool {
 	return legalTopic.MatchString(topic)
 }
 
-func encodeGob(str string) []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(str)
-	common.PanicIfError(err, lang.T_internal_error, " unable to encode str %s", str)
-	return  buf.Bytes()
-}
-
 // Publish with context tracing
-func (me *EventStore) PublishT(ctx commonpb.Context, topic string, data interface{}, key string) (par int32, offset int64) {
+func (me EventStore) PublishT(ctx commonpb.Context, topic string, data interface{}, key string) (par int32, offset int64) {
 	return me.Publish(topic, data, key)
 }
 
 // Publish a event to kafka
 // data must be type of []byte or proto.Message or string
 // string will be encode using encoding/gob
-func (me *EventStore) Publish(topic string, data interface{}, key string) (partition int32, offset int64) {
+func (me EventStore) Publish(topic string, data interface{}, key string) (partition int32, offset int64) {
 	if !validateTopicName(topic) {
 		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
 	}
 	var value []byte
-	var ok bool
 	// convert value from proto.message or string to []byte
 	if data == nil {
 		panic(common.New500(lang.T_empty, "value is nil"))
 	}
 
-	promes, ok := data.(proto.Message)
-	if ok {
-		value = common.Protify(promes)
-	} else {
-		value, ok = data.([]byte)
-		if !ok {
-			valuestr, ok := data.(string)
-			if !ok {
-				panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
-			}
-			value = []byte(valuestr)//encodeGob(valuestr)
-		}
+	switch dat := data.(type) {
+	case proto.Message:
+		value = common.Protify(dat)
+	case []byte:
+		value = dat
+	case string:
+		value = []byte(dat)
+	default:
+		panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
 	}
 
-	msg := prepareMessage(key, topic, value)
-	partition, offset, err := me.producer.SendMessage(msg)
+	msg := prepareMessage(key, topic)
+	msg.Value = sarama.ByteEncoder(value)
+	partition, offset, err := me.producer.SendMessage(&msg)
 	if err != nil {
 		common.Log(nil, topic, data)
 		// TODO: this is bad, should we panic or retry
@@ -125,79 +99,55 @@ func (me *EventStore) Publish(topic string, data interface{}, key string) (parti
 	return partition, offset
 }
 
-func prepareMessage(key, topic string, message []byte) *sarama.ProducerMessage {
-	var msg *sarama.ProducerMessage
+func prepareMessage(key, topic string) sarama.ProducerMessage {
 	if key == "" {
-		msg = &sarama.ProducerMessage{
+		return sarama.ProducerMessage{
 			Topic: topic,
 			Partition: -1,
-			Value: sarama.ByteEncoder(message),
-		}
-	} else {
-		msg = &sarama.ProducerMessage{
-			Key: sarama.StringEncoder(key),
-			Topic: topic,
-			//Partition: -1,
-			Value: sarama.ByteEncoder(message),
 		}
 	}
-	return msg
+	return sarama.ProducerMessage{
+		Key: sarama.StringEncoder(key),
+		Topic: topic,
+	}
 }
 
 // Listen start listening kafka consumer
-func (me *EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
-	var nhok bool
-	var nh  func(map[string][]int32)
+func (me EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
+	var nh func(map[string][]int32)
 	if len(cbs) > 0 {
-		nh, nhok = cbs[0].(func(map[string][]int32))
-		if !nhok {
-			debug.PrintStack()
-			panic("parameter 2 should have type of type func(map[string][]int32)")
-		}
+		nh = cbs[0].(func(map[string][]int32))
 	}
 
-	firstmessage := true
 	for {	select {
 	case msg, more := <-me.consumer.Messages():
 		if !more {
 			goto end
 		}
-
-		if firstmessage && nh != nil {
-			firstmessage = false
-			go nh(me.consumer.Subscriptions())
-		}
 		out := func() bool { // don't allow this function die
 			defer func() {
 				r := recover()
-				if r != nil {
-					debug.PrintStack()
-					common.LogError(common.Info{
-						"r": fmt.Sprintf("%v", r),
-					})
-				}
+				common.LogErr(r)
 			}()
 			return h(msg.Partition, msg.Topic, msg.Value, msg.Offset)
 		}()
-		me.consumer.MarkOffset(msg, "")
+
 		if !out {
 			goto end
+		}
+		me.consumer.MarkOffset(msg, "")
+	case ntf, more := <-me.consumer.Notifications():
+		if !more {
+			goto end
+		}
+		if nh != nil {
+			nh(ntf.Current)
 		}
 	case err, more := <-me.consumer.Errors():
 		if !more {
 			goto end
 		}
-		common.LogError(common.Info{
-			"err": fmt.Sprintf("%v", err),
-		})
-	case ntf, more := <-me.consumer.Notifications():
-		if !more {
-			goto end
-		}
-		if nhok {
-			firstmessage = false
-			nh(ntf.Current)
-		}
+		common.LogErr(err)
 	case <-EndSignal():
 		goto end
 	}}
@@ -223,8 +173,7 @@ func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consum
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
 	c.Group.Session.Timeout = 6 * time.Second
-	//c.Group.Return.Notifications = true
-	//common.Log(topics)
+	c.Group.Return.Notifications = true
 
 	ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
 	var err error
