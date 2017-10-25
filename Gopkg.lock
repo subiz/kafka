@@ -4,20 +4,14 @@
 [[projects]]
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "00449bbec5242580d6ce07b255343a94dc050a96"
-  version = "v1.0.8"
+  revision = "5eacf674666d240327e67927118f6daf66331942"
+  version = "v1.0.9"
 
 [[projects]]
   name = "bitbucket.org/subiz/header"
   packages = ["account","auth","client","common","conversation","event","lang","user"]
-  revision = "685ab6cc21b796db6afcf0c54af68939d40d5ae0"
-  version = "v1.0.7"
-
-[[projects]]
-  name = "github.com/Microsoft/go-winio"
-  packages = ["."]
-  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
-  version = "v0.4.5"
+  revision = "451993ae909132f7fcfa4478256b3e9df8f84808"
+  version = "v1.0.13"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -42,30 +36,6 @@
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
-
-[[projects]]
-  name = "github.com/docker/distribution"
-  packages = ["digest","reference"]
-  revision = "48294d928ced5dd9b378f7fd7c6f5da3ff3f2c89"
-  version = "v2.6.2"
-
-[[projects]]
-  name = "github.com/docker/docker"
-  packages = ["api/types","api/types/blkiodev","api/types/container","api/types/events","api/types/filters","api/types/mount","api/types/network","api/types/reference","api/types/registry","api/types/strslice","api/types/swarm","api/types/time","api/types/versions","api/types/volume","pkg/tlsconfig"]
-  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
-  version = "v1.13.1"
-
-[[projects]]
-  name = "github.com/docker/go-connections"
-  packages = ["nat","sockets","tlsconfig"]
-  revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
-  version = "v0.3.0"
-
-[[projects]]
-  name = "github.com/docker/go-units"
-  packages = ["."]
-  revision = "0dadbb0345b35ec7ef35e228dabb8de89a65bf52"
-  version = "v0.3.2"
 
 [[projects]]
   name = "github.com/eapache/go-resiliency"
@@ -152,16 +122,10 @@
   revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
 
 [[projects]]
-  name = "github.com/moby/moby"
-  packages = ["client"]
-  revision = "092cba3727bb9b4a2f0e922cd6c0f93ea270e363"
-  version = "v1.13.1"
-
-[[projects]]
   branch = "master"
   name = "github.com/orcaman/concurrent-map"
   packages = ["."]
-  revision = "2ae17bc4c860c83513ee50feb9746f3e50d7515d"
+  revision = "d4c23bd0e01134806215ffe65ba3fd22ec6721f7"
 
 [[projects]]
   name = "github.com/pierrec/lz4"
@@ -174,12 +138,6 @@
   packages = ["xxHash32"]
   revision = "f051bb7f1d1aaf1b5a665d74fb6b0217712c69f7"
   version = "v0.1.1"
-
-[[projects]]
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
 
 [[projects]]
   branch = "master"
@@ -196,14 +154,14 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp","proxy"]
-  revision = "cd69bc3fc700721b709c3a59e16e24c67b58f6ff"
+  packages = ["context"]
+  revision = "4b14673ba32bee7f5ac0f990a48f033919fd418b"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
-  revision = "8dbc5d05d6edcc104950cc299a1ce6641235bc86"
+  packages = ["unix"]
+  revision = "a1a1f1746d156bbc9954f29134b20ed4ce2752f1"
 
 [[projects]]
   name = "google.golang.org/grpc"
