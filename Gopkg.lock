@@ -2,16 +2,16 @@
 
 
 [[projects]]
+  branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "456e8437d9267cbcc3fb236853196371c3fb06db"
-  version = "v1.0.12"
+  revision = "95e61ff6299776967b00e91e649d8a2c6fcd23c4"
 
 [[projects]]
+  branch = "master"
   name = "bitbucket.org/subiz/header"
   packages = ["account","auth","client","common","content","conversation","event","lang","user"]
-  revision = "811f44a79461d12df8b8387f11933d3e772b0b70"
-  version = "v1.0.20"
+  revision = "d457a84f8d88b128ed4579cfd9e5ed26da3b62f7"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -172,6 +172,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a18f2e32dccabe5ff3ac922f55195793b135272d07dd3c8497029ff00404e33a"
+  inputs-digest = "744be9ea32e4ef124452c75acb81c9d2148213754a4be59b62411a62871a939e"
   solver-name = "gps-cdcl"
   solver-version = 1
