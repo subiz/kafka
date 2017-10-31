@@ -4,14 +4,14 @@
 [[projects]]
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "5eacf674666d240327e67927118f6daf66331942"
-  version = "v1.0.9"
+  revision = "456e8437d9267cbcc3fb236853196371c3fb06db"
+  version = "v1.0.12"
 
 [[projects]]
   name = "bitbucket.org/subiz/header"
-  packages = ["account","auth","client","common","conversation","event","lang","user"]
-  revision = "451993ae909132f7fcfa4478256b3e9df8f84808"
-  version = "v1.0.13"
+  packages = ["account","auth","client","common","content","conversation","event","lang","user"]
+  revision = "811f44a79461d12df8b8387f11933d3e772b0b70"
+  version = "v1.0.20"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -77,7 +77,7 @@
   branch = "master"
   name = "github.com/gorilla/schema"
   packages = ["."]
-  revision = "8b1100835db5bbdae88541510f70d114b91a7e4d"
+  revision = "693523c4a63442cd587a21af72c8741f7c01dcb7"
 
 [[projects]]
   name = "github.com/hashicorp/consul"
@@ -155,19 +155,19 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "4b14673ba32bee7f5ac0f990a48f033919fd418b"
+  revision = "c73622c77280266305273cb545f54516ced95b93"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "a1a1f1746d156bbc9954f29134b20ed4ce2752f1"
+  revision = "95c6576299259db960f6c5b9b69ea52422860fce"
 
 [[projects]]
   name = "google.golang.org/grpc"
   packages = ["metadata"]
-  revision = "f7bf885db0b7479a537ec317c6e48ce53145f3db"
-  version = "v1.7.0"
+  revision = "61d37c5d657a47e4404fd6823bd598341a2595de"
+  version = "v1.7.1"
 
 [solve-meta]
   analyzer-name = "dep"

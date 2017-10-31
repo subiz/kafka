@@ -35,7 +35,7 @@ func newProducer(brokers []string) sarama.SyncProducer {
 	config.Producer.Return.Successes = true
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
-	common.PanicIfError(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
+	common.DieIf(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
 
 	return producer
 }
@@ -153,7 +153,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 	}}
 end:
 	err := me.consumer.Close()
-	common.Panic(err)
+	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
 }
 
 func (me *EventStore) CloseConsumer() {
@@ -163,7 +163,7 @@ func (me *EventStore) CloseConsumer() {
 func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consumer {
 	for _, t := range topics {
 		if !validateTopicName(t) {
-			common.PanicIfError(&common.Error{}, lang.T_invalid_kafka_topic, "topic is not valid, %v", t)
+			panic(common.New500(lang.T_invalid_kafka_topic, "topic is not valid, %v", t))
 		}
 	}
 	c := cluster.NewConfig()
@@ -187,7 +187,7 @@ func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consum
 		ticker.Stop()
 		break
 	}
-	common.Panicf(err, "unable to create consumer with brokers %v", brokers)
+	common.DieIf(err, lang.T_kafka_error, "unable to create consumer with brokers %v", brokers)
 	return consumer
 }
 
