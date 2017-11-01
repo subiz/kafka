@@ -114,6 +114,7 @@ func prepareMessage(key, topic string) sarama.ProducerMessage {
 
 // Listen start listening kafka consumer
 func (me EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
+	defer common.Recover()
 	var nh func(map[string][]int32)
 	if len(cbs) > 0 {
 		nh = cbs[0].(func(map[string][]int32))
@@ -125,10 +126,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 			goto end
 		}
 		out := func() bool { // don't allow this function die
-			defer func() {
-				r := recover()
-				common.LogErr(r)
-			}()
+			defer common.Recover()
 			return h(msg.Partition, msg.Topic, msg.Value, msg.Offset)
 		}()
 
