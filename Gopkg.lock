@@ -5,7 +5,7 @@
   branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "95e61ff6299776967b00e91e649d8a2c6fcd23c4"
+  revision = "5208a42446ba0ffc6e5ae30c5c932717e8ff125a"
 
 [[projects]]
   branch = "master"
