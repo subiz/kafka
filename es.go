@@ -12,6 +12,7 @@ import (
 	"time"
 	commonpb "bitbucket.org/subiz/header/common"
 	"bitbucket.org/subiz/header/lang"
+	"strings"
 )
 
 // EventStore publish and listen to kafka events
@@ -41,10 +42,15 @@ func newProducer(brokers []string) sarama.SyncProducer {
 }
 
 // Connect to kafka brokers
-func (me *EventStore) Connect(brokers, topics []string, consumergroup string) {
-	if len(topics) != 0 {
-		me.consumer = newConsumer(brokers, topics, consumergroup)
+func (me *EventStore) Connect(brokers, topics []string, consumergroup string, frombegin ...bool) {
+	fb := true
+	if len(frombegin) == 1 {
+		fb = frombegin[0]
 	}
+	if len(topics) != 0 {
+		me.consumer = newConsumer(brokers, topics, consumergroup, fb)
+	}
+
 	me.brokers = brokers
 	me.cg = consumergroup
 	me.stopchan = make(chan bool)
@@ -158,10 +164,11 @@ func (me *EventStore) CloseConsumer() {
 	me.consumer.Close()
 }
 
-func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consumer {
-	for _, t := range topics {
-		if !validateTopicName(t) {
-			panic(common.New500(lang.T_invalid_kafka_topic, "topic is not valid, %v", t))
+func newConsumer(brokers, topics []string, consumergroup string, frombegin bool) *cluster.Consumer {
+	for i := range topics {
+		topics[i] = strings.Trim(topics[i], " ")
+		if !validateTopicName(topics[i]) {
+			panic(common.New500(lang.T_invalid_kafka_topic, "topic is not valid, %v", topics[i]))
 		}
 	}
 	c := cluster.NewConfig()
@@ -169,7 +176,11 @@ func newConsumer(brokers, topics []string, consumergroup string) *cluster.Consum
 	//c.Consumer.Offsets.CommitInterval = 1 * time.Millisecond
 	//c.Consumer.Offsets.Retention = 0
 	c.Consumer.Return.Errors = true
-	c.Consumer.Offsets.Initial = sarama.OffsetOldest
+	if frombegin {
+		c.Consumer.Offsets.Initial = sarama.OffsetOldest
+	} else {
+		c.Consumer.Offsets.Initial = sarama.OffsetNewest
+	}
 	c.Group.Session.Timeout = 6 * time.Second
 	c.Group.Return.Notifications = true
 

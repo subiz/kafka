@@ -5,25 +5,25 @@
   branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "5208a42446ba0ffc6e5ae30c5c932717e8ff125a"
+  revision = "561e6a05ddeab9df5cb27830767b9ac7c4204f4e"
 
 [[projects]]
   branch = "master"
   name = "bitbucket.org/subiz/header"
-  packages = ["account","auth","client","common","content","conversation","event","lang","user"]
-  revision = "d457a84f8d88b128ed4579cfd9e5ed26da3b62f7"
+  packages = ["auth","common","lang"]
+  revision = "00d817f5e398e7b93d1bb932d73025924c2f0677"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
   packages = ["."]
-  revision = "bbdbe644099b7fdc8327d5cc69c030945188b2e9"
-  version = "v1.13.0"
+  revision = "240fd146ce68bcafb034cc5dc977229ffbafa8ea"
+  version = "v1.14.0"
 
 [[projects]]
   name = "github.com/bsm/sarama-cluster"
   packages = ["."]
-  revision = "ccdc0803695fbce22f1706d04ded46cd518fd832"
-  version = "v2.1.8"
+  revision = "abf039439f66c1ce78017f560b490612552f6472"
+  version = "v2.1.10"
 
 [[projects]]
   name = "github.com/cenkalti/backoff"
@@ -52,8 +52,8 @@
 [[projects]]
   name = "github.com/eapache/queue"
   packages = ["."]
-  revision = "ded5959c0d4e360646dc9e9908cff48666781367"
-  version = "v1.0.2"
+  revision = "44cc805cf13205b55f69e14bcb69867d1ae92f98"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/fatih/color"
@@ -77,13 +77,13 @@
   branch = "master"
   name = "github.com/gorilla/schema"
   packages = ["."]
-  revision = "693523c4a63442cd587a21af72c8741f7c01dcb7"
+  revision = "8b1100835db5bbdae88541510f70d114b91a7e4d"
 
 [[projects]]
   name = "github.com/hashicorp/consul"
   packages = ["api"]
-  revision = "51ea240df8476e02215d53fbfad5838bf0d44d21"
-  version = "v1.0.0"
+  revision = "9564c2978b59c060aed0657e662a4eb1c6f35356"
+  version = "v1.0.1"
 
 [[projects]]
   branch = "master"
@@ -125,7 +125,7 @@
   branch = "master"
   name = "github.com/orcaman/concurrent-map"
   packages = ["."]
-  revision = "d4c23bd0e01134806215ffe65ba3fd22ec6721f7"
+  revision = "2ae17bc4c860c83513ee50feb9746f3e50d7515d"
 
 [[projects]]
   name = "github.com/pierrec/lz4"
@@ -155,19 +155,19 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "c73622c77280266305273cb545f54516ced95b93"
+  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "95c6576299259db960f6c5b9b69ea52422860fce"
+  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
 
 [[projects]]
   name = "google.golang.org/grpc"
   packages = ["metadata"]
-  revision = "61d37c5d657a47e4404fd6823bd598341a2595de"
-  version = "v1.7.1"
+  revision = "5a9f7b402fe85096d2e1d0383435ee1876e863d0"
+  version = "v1.8.0"
 
 [solve-meta]
   analyzer-name = "dep"
