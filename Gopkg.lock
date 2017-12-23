@@ -5,13 +5,13 @@
   branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "561e6a05ddeab9df5cb27830767b9ac7c4204f4e"
+  revision = "adc7ff7447b14703cdabca9ddfaee18188a78b18"
 
 [[projects]]
   branch = "master"
   name = "bitbucket.org/subiz/header"
   packages = ["auth","common","lang"]
-  revision = "00d817f5e398e7b93d1bb932d73025924c2f0677"
+  revision = "a518640e484407c11945be050ecbd2639e34b4a0"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -155,13 +155,13 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context"]
-  revision = "a8b9294777976932365dabb6640cf1468d95c70f"
+  revision = "d866cfc389cec985d6fda2859936a575a55a3ab6"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "8b4580aae2a0dd0c231a45d3ccb8434ff533b840"
+  revision = "83801418e1b59fb1880e363299581ee543af32ca"
 
 [[projects]]
   name = "google.golang.org/grpc"

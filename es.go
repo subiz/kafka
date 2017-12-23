@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+var partitioner = sarama.NewHashPartitioner("")
+
 // EventStore publish and listen to kafka events
 type EventStore struct {
 	consumer *cluster.Consumer
@@ -204,4 +206,10 @@ func EndSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 	return signals
+}
+
+func HashKeyToPar(N int, key string) int32 {
+	par, err := partitioner.Partition(&sarama.ProducerMessage{}, int32(N))
+	common.DieIf(err, lang.T_kafka_error, "unable to hash key %s to partition", key)
+	return par
 }
