@@ -35,6 +35,7 @@ func NewRouter(es *EventStore, service, serviceid string, routes R) *Router {
 		service: service,
 		serviceid: serviceid,
 		routes: rs,
+		es: es,
 	}
 }
 
