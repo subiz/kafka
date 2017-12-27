@@ -15,6 +15,7 @@ type ft struct {
 }
 type Router struct {
 	routes map[string]ft
+	pctx *compb.Context
 	rr common.RequestReply
 	es *EventStore
 	service string
@@ -49,15 +50,10 @@ func Str(s string) fmt.Stringer {
 	return &stringer{s:s}
 }
 
-func (r *Router) Handle(octx *context.Context, val []byte, ret proto.Message, err error) {
+func (r *Router) Handle(octx *context.Context, val []byte) {
 	payload := &compb.Empty{}
-	var pctx *compb.Context
-	pctx, *octx = r.rr.ParseContext(val, payload) // parse proto 1 time to get topic
-	defer func() {
-		r.rr.HandleReply(recover(), r.es, pctx, err, ret, r.service, r.serviceid)
-	}()
-
-	handler := r.routes[pctx.GetTopic()]
+	r.pctx, *octx = r.rr.ParseContext(val, payload) // parse proto 1 time to get topic
+	handler := r.routes[r.pctx.GetTopic()]
 	if handler.t == nil {
 		common.LogErr("unknown route")
 		return
@@ -66,4 +62,8 @@ func (r *Router) Handle(octx *context.Context, val []byte, ret proto.Message, er
 	pptr.Elem().Set(reflect.Zero(handler.t.Elem()))
 	r.rr.ParseContext(val, pptr.Interface().(common.Payload))
 	handler.f.Call([]reflect.Value{pptr})
+}
+
+func (r *Router) Return(reco interface{}, ret proto.Message, err error) {
+	r.rr.HandleReply(reco, r.es, r.pctx, err, ret, r.service, r.serviceid)
 }
