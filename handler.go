@@ -17,14 +17,13 @@ type Router struct {
 	routes map[string]ft
 	pctx *compb.Context
 	rr common.RequestReply
-	es *EventStore
 	service string
 	serviceid string
 }
 
 type R map[fmt.Stringer]interface{}
 
-func NewRouter(es *EventStore, service, serviceid string, routes R) *Router {
+func NewRouter(service, serviceid string, routes R) *Router {
 	rs := make(map[string]ft)
 	for k, v := range routes {
 		f := reflect.ValueOf(v)
@@ -35,7 +34,6 @@ func NewRouter(es *EventStore, service, serviceid string, routes R) *Router {
 		service: service,
 		serviceid: serviceid,
 		routes: rs,
-		es: es,
 	}
 }
 
@@ -65,6 +63,6 @@ func (r *Router) Handle(octx *context.Context, val []byte) {
 	handler.f.Call([]reflect.Value{pptr})
 }
 
-func (r *Router) Return(reco interface{}, ret proto.Message, err error) {
-	r.rr.HandleReply(reco, r.es, r.pctx, err, ret, r.service, r.serviceid)
+func (r *Router) Return(es *EventStore, reco interface{}, ret proto.Message, err error) {
+	r.rr.HandleReply(reco, es, r.pctx, err, ret, r.service, r.serviceid)
 }

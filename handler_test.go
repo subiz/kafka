@@ -29,8 +29,7 @@ func TestRouter(t *testing.T) {
 	ok := false
 
 	value := common.Protify(myacc)
-	es := &kafka.EventStore{}
-	r := kafka.NewRouter(es, "", "", kafka.R{
+	r := kafka.NewRouter("", "", kafka.R{
 		kafka.Str("e128"): func(acc *account.Account) {
 			if acc.GetId() != myacc.GetId() {
 				t.Fatalf("should equal, got %s", acc.GetId())
@@ -44,8 +43,7 @@ func TestRouter(t *testing.T) {
 		},
 	})
 
-	r.Handle(&ctx, value, nil, nil)
-
+	r.Handle(&ctx, value)
 	if !ok {
 		t.Fatal("shoul be call")
 	}
@@ -53,9 +51,8 @@ func TestRouter(t *testing.T) {
 
 func BenchmarkRouter(b *testing.B) {
 	var ctx context.Context
-	r := kafka.NewRouter(nil, "", "", kafka.R{
+	r := kafka.NewRouter("", "", kafka.R{
 		kafka.Str("e128"): func(acc *account.Account) {
-
 		},
 	})
 	myacc := &account.Account{
@@ -70,7 +67,7 @@ func BenchmarkRouter(b *testing.B) {
 	value := common.Protify(myacc)
 
 	for n := 0; n < b.N; n++ {
-		r.Handle(&ctx, value, nil, nil)
+		r.Handle(&ctx, value)
 	}
 }
 
