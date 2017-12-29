@@ -22,20 +22,20 @@
 
 
 [[constraint]]
-  name = "bitbucket.org/subiz/gocommon"
   branch = "master"
+  name = "bitbucket.org/subiz/gocommon"
 
 [[constraint]]
-  name = "bitbucket.org/subiz/header"
   branch = "master"
+  name = "bitbucket.org/subiz/header"
 
 [[constraint]]
   name = "github.com/Shopify/sarama"
-  version = "1.13.0"
+  version = "1.14.0"
 
 [[constraint]]
   name = "github.com/bsm/sarama-cluster"
-  version = "2.1.8"
+  version = "2.1.10"
 
 [[constraint]]
   name = "github.com/cenkalti/backoff"

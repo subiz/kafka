@@ -11,7 +11,7 @@
   branch = "master"
   name = "bitbucket.org/subiz/header"
   packages = ["account","auth","common","lang"]
-  revision = "15094285c197ea377a5a478b9c3d6596aab754af"
+  revision = "ece5457cf7f78e66f658cacc49b5aef05ea358bf"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -184,6 +184,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1bac58e208d44b30f776de4856b8f9dced8bd621d207cd949746dfb5ba5456b8"
+  inputs-digest = "786cf9cfb5111d94619df5324af9703b8efbc510f96cc15f2664a671a7b662fb"
   solver-name = "gps-cdcl"
   solver-version = 1
