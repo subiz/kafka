@@ -54,8 +54,7 @@ func (r *Router) Handle(octx *context.Context, val []byte) {
 	r.pctx, *octx = r.rr.ParseContext(val, payload) // parse proto 1 time to get topic
 	handler := r.routes[r.pctx.GetTopic()]
 	if handler.t == nil {
-		common.LogErr("unknown route")
-		return
+		return // silently return
 	}
 	pptr := reflect.New(handler.t.Elem())
 	pptr.Elem().Set(reflect.Zero(handler.t.Elem()))
