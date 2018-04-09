@@ -77,33 +77,37 @@ func (me EventStore) PublishT(ctx commonpb.Context, topic string, data interface
 // data must be type of []byte or proto.Message or string
 // string will be encode using encoding/gob
 func (me EventStore) Publish(topic string, data interface{}, key string) (partition int32, offset int64) {
-	if !validateTopicName(topic) {
-		panic(common.New500(lang.T_topic_is_empty, "topic should not be empty or contains invalid characters, got %s", topic))
-	}
 	var value []byte
 	// convert value from proto.message or string to []byte
 	if data == nil {
 		panic(common.New500(lang.T_empty, "value is nil"))
 	}
-
-	switch dat := data.(type) {
+	var err error
+	switch data := data.(type) {
 	case proto.Message:
-		value = common.Protify(dat)
+		value, err = proto.Marshal(data)
+		if err != nil {
+			panic(common.New500(lang.T_wrong_type, "unable to protify struct %v", data))
+		}
 	case []byte:
-		value = dat
+		value = data
 	case string:
-		value = []byte(dat)
+		value = []byte(data)
 	default:
 		panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
 	}
 
 	msg := prepareMessage(key, topic)
 	msg.Value = sarama.ByteEncoder(value)
-	partition, offset, err := me.producer.SendMessage(&msg)
-	if err != nil {
-		common.Log(nil, topic, data)
-		// TODO: this is bad, should we panic or retry
-		panic(common.New500(lang.T_unable_to_send_message, "%v, topic: %s, data: %v", err, topic, data))
+	for {
+		partition, offset, err = me.producer.SendMessage(&msg)
+		if err == nil {
+			break
+		}
+		common.LogErr(err)
+		common.Log("unable to publist message, topic: %s, data: %v", topic, data)
+		common.Log("retrying after 5sec")
+		time.Sleep(5 * time.Second)
 	}
 	return partition, offset
 }
@@ -161,6 +165,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 		}
 	}
 end:
+	common.Log("STOPED==============================")
 	err := me.consumer.Close()
 	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
 }
@@ -183,7 +188,7 @@ func (me *EventStore) EnableSaramaLogging() {
 
 func newConsumer(brokers, topics []string, consumergroup string, frombegin bool) *cluster.Consumer {
 	for i := range topics {
-		topics[i] = strings.Trim(topics[i], " ")
+		topics[i] = strings.TrimSpace(topics[i])
 		if !validateTopicName(topics[i]) {
 			panic(common.New500(lang.T_invalid_kafka_topic, "topic is not valid, %v", topics[i]))
 		}
