@@ -2,17 +2,18 @@ package kafka
 
 import (
 	"bitbucket.org/subiz/gocommon"
-	proto "github.com/golang/protobuf/proto"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"os"
-	"os/signal"
-	"github.com/cenkalti/backoff"
-	"regexp"
-	"time"
 	commonpb "bitbucket.org/subiz/header/common"
 	"bitbucket.org/subiz/header/lang"
+	"github.com/Shopify/sarama"
+	cluster "github.com/bsm/sarama-cluster"
+	"github.com/cenkalti/backoff"
+	proto "github.com/golang/protobuf/proto"
+	"log"
+	"os"
+	"os/signal"
+	"regexp"
 	"strings"
+	"time"
 )
 
 var partitioner = sarama.NewHashPartitioner("")
@@ -22,8 +23,8 @@ type EventStore struct {
 	consumer *cluster.Consumer
 	producer sarama.SyncProducer
 	stopchan chan bool
-	cg string
-	brokers []string
+	cg       string
+	brokers  []string
 }
 
 // Close clean resource
@@ -110,12 +111,12 @@ func (me EventStore) Publish(topic string, data interface{}, key string) (partit
 func prepareMessage(key, topic string) sarama.ProducerMessage {
 	if key == "" {
 		return sarama.ProducerMessage{
-			Topic: topic,
+			Topic:     topic,
 			Partition: -1,
 		}
 	}
 	return sarama.ProducerMessage{
-		Key: sarama.StringEncoder(key),
+		Key:   sarama.StringEncoder(key),
 		Topic: topic,
 	}
 }
@@ -128,35 +129,37 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 		nh = cbs[0].(func(map[string][]int32))
 	}
 
-	for {	select {
-	case msg, more := <-me.consumer.Messages():
-		if !more {
-			goto end
-		}
-		out := func() bool { // don't allow this function die
-			defer common.Recover()
-			return h(msg.Partition, msg.Topic, msg.Value, msg.Offset)
-		}()
+	for {
+		select {
+		case msg, more := <-me.consumer.Messages():
+			if !more {
+				goto end
+			}
+			out := func() bool { // don't allow this function die
+				defer common.Recover()
+				return h(msg.Partition, msg.Topic, msg.Value, msg.Offset)
+			}()
 
-		if !out {
+			if !out {
+				goto end
+			}
+			me.consumer.MarkOffset(msg, "")
+		case ntf, more := <-me.consumer.Notifications():
+			if !more {
+				goto end
+			}
+			if nh != nil {
+				nh(ntf.Current)
+			}
+		case err, more := <-me.consumer.Errors():
+			if !more {
+				goto end
+			}
+			common.LogErr(err)
+		case <-EndSignal():
 			goto end
 		}
-		me.consumer.MarkOffset(msg, "")
-	case ntf, more := <-me.consumer.Notifications():
-		if !more {
-			goto end
-		}
-		if nh != nil {
-			nh(ntf.Current)
-		}
-	case err, more := <-me.consumer.Errors():
-		if !more {
-			goto end
-		}
-		common.LogErr(err)
-	case <-EndSignal():
-		goto end
-	}}
+	}
 end:
 	err := me.consumer.Close()
 	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
@@ -164,6 +167,18 @@ end:
 
 func (me *EventStore) CloseConsumer() {
 	me.consumer.Close()
+}
+
+func (me *EventStore) GetConsumer() *cluster.Consumer {
+	return me.consumer
+}
+
+func (me *EventStore) GetConsumerSubscriptions() map[string][]int32 {
+	return me.consumer.Subscriptions()
+}
+
+func (me *EventStore) EnableSaramaLogging() {
+	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 }
 
 func newConsumer(brokers, topics []string, consumergroup string, frombegin bool) *cluster.Consumer {
