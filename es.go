@@ -125,6 +125,60 @@ func prepareMessage(key, topic string) sarama.ProducerMessage {
 	}
 }
 
+func (me EventStore) CommitManually() error {
+	return me.consumer.CommitOffsets()
+}
+
+func (me EventStore) MarkOffset(topic string, par int32, offset int64) {
+	me.consumer.MarkOffset(&sarama.ConsumerMessage{
+		Topic:     topic,
+		Partition: par,
+		Offset:    offset,
+	}, "")
+}
+
+// Peek just like Listen but do not commit
+func (me EventStore) Peek(h func(string, int32, int64, []byte) bool, cbs ...interface{}) {
+	defer common.Recover()
+	var nh func(map[string][]int32)
+	if len(cbs) > 0 {
+		nh = cbs[0].(func(map[string][]int32))
+	}
+
+	for {
+		select {
+		case msg, more := <-me.consumer.Messages():
+			if !more {
+				goto end
+			}
+			if false == func() bool { // don't allow this function die
+				defer common.Recover()
+				return h(msg.Topic, msg.Partition, msg.Offset, msg.Value)
+			}() {
+				goto end
+			}
+		case ntf, more := <-me.consumer.Notifications():
+			if !more {
+				goto end
+			}
+			if nh != nil {
+				nh(ntf.Current)
+			}
+		case err, more := <-me.consumer.Errors():
+			if !more {
+				goto end
+			}
+			common.LogErr(err)
+		case <-EndSignal():
+			goto end
+		}
+	}
+end:
+	common.Log("STOPED==============================")
+	err := me.consumer.Close()
+	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
+}
+
 // Listen start listening kafka consumer
 func (me EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
 	defer common.Recover()
@@ -203,7 +257,7 @@ func newConsumer(brokers, topics []string, consumergroup string, frombegin bool)
 	} else {
 		c.Consumer.Offsets.Initial = sarama.OffsetNewest
 	}
-	c.Group.Session.Timeout = 6 * time.Second
+	c.Group.Session.Timeout = 10 * time.Second
 	c.Group.Return.Notifications = true
 
 	ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
