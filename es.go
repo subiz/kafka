@@ -6,7 +6,6 @@ import (
 	"bitbucket.org/subiz/header/lang"
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	"github.com/cenkalti/backoff"
 	proto "github.com/golang/protobuf/proto"
 	"log"
 	"os"
@@ -260,19 +259,18 @@ func newConsumer(brokers, topics []string, consumergroup string, frombegin bool)
 	c.Group.Session.Timeout = 10 * time.Second
 	c.Group.Return.Notifications = true
 
-	ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
 	var err error
 	var consumer *cluster.Consumer
-	for range ticker.C {
+	for {
 		consumer, err = cluster.NewConsumer(brokers, consumergroup, topics, c)
 		if err != nil {
 			common.Log(err, "will retry...")
+			time.Sleep(3 * time.Second)
 			continue
 		}
-		ticker.Stop()
 		break
 	}
-	common.DieIf(err, lang.T_kafka_error, "unable to create consumer with brokers %v", brokers)
+
 	return consumer
 }
 
