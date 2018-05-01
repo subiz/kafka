@@ -1,3 +1,5 @@
+// +build ignore
+
 package kafka
 
 import (
@@ -34,8 +36,8 @@ func TestPublishAndSubscribe(t *testing.T) {
 			key := binary.LittleEndian.Uint64(data)
 			datamap[key] = true
 			return len(datamap) < n
-		}, func(m map[string][]int32 {
-		}))
+		}, func(m map[string][]int32) {
+		})
 		es.Close()
 		donechan <- true
 	}()
