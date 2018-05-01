@@ -1,95 +1,170 @@
-package kafka_test
+package kafka
 
 import (
-	"testing"
-	"bitbucket.org/subiz/kafka"
-	"context"
-	"bitbucket.org/subiz/header/account"
 	"bitbucket.org/subiz/gocommon"
+	"bitbucket.org/subiz/header/account"
+	cpb "bitbucket.org/subiz/header/common"
+	"context"
 	"fmt"
-	compb "bitbucket.org/subiz/header/common"
-	"bitbucket.org/subiz/header/auth"
+	"github.com/Shopify/sarama"
+	cluster "github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
+	"hash/crc32"
+	"testing"
+	"time"
 )
 
-func Route() {
+var crc32q = crc32.MakeTable(0xD5828281)
+
+type String struct {
+	s string
 }
 
-func TestRouter(t *testing.T) {
-	var ctx context.Context = context.Background()
-	myacc := &account.Account{
-		Ctx: &compb.Context{
-			Topic: "e128",
-			Credential: &auth.Credential{
-				ClientId: "client",
-			},
-		},
-		Id: common.Ps("hv"),
+func (s String) String() string {
+	return s.s
+}
+
+type ConsumerMock struct {
+	mes    chan *sarama.ConsumerMessage
+	not    chan *cluster.Notification
+	commit chan *sarama.ConsumerMessage
+	maxpar int32
+}
+
+func NewConsumerMock(par int32) *ConsumerMock {
+	return &ConsumerMock{
+		maxpar: par,
+		mes:    make(chan *sarama.ConsumerMessage),
+		commit: make(chan *sarama.ConsumerMessage),
+		not:    make(chan *cluster.Notification),
 	}
+}
 
-	ok := false
+func (c *ConsumerMock) CommitChan() <-chan *sarama.ConsumerMessage {
+	return c.commit
+}
 
-	value := common.Protify(myacc)
-	r := kafka.NewRouter("", "", kafka.R{
-		kafka.Str("e128"): func(acc *account.Account) {
-			if acc.GetId() != myacc.GetId() {
-				t.Fatalf("should equal, got %s", acc.GetId())
+func (c *ConsumerMock) Publish(topic string, offset int64, key string, p proto.Message) {
+	b, _ := proto.Marshal(p)
+
+	par := int32(crc32.Checksum([]byte(key), crc32q)) % c.maxpar
+	c.mes <- &sarama.ConsumerMessage{
+		Partition: par,
+		Topic:     topic,
+		Key:       []byte(key),
+		Offset:    offset,
+		Value:     b,
+	}
+}
+
+func (c *ConsumerMock) Notify(noti map[string][]int32) {
+	c.not <- &cluster.Notification{Current: noti}
+}
+
+func (c *ConsumerMock) MarkOffset(msg *sarama.ConsumerMessage, metadata string) {
+	c.commit <- msg
+}
+
+func (c *ConsumerMock) CommitOffsets() error {
+	return nil
+}
+
+func (c *ConsumerMock) Messages() <-chan *sarama.ConsumerMessage {
+	return c.mes
+}
+
+func (c *ConsumerMock) Notifications() <-chan *cluster.Notification {
+	return c.not
+}
+
+func (c *ConsumerMock) Errors() <-chan error {
+	return make(chan error, 0)
+}
+
+func (c *ConsumerMock) Close() error {
+	return nil
+}
+
+func createMsg(topic, name string) *account.Account {
+	a := &account.Account{
+		Ctx:  &cpb.Context{Topic: topic},
+		Name: &name,
+	}
+	return a
+}
+
+func TestCommitManually(t *testing.T) {
+	N, called := int64(400), int64(0)
+	call, done := make(chan bool), make(chan bool)
+
+	topic := "mot"
+	csm := NewConsumerMock(4)
+	go func() {
+		for c := range csm.CommitChan() {
+			if c.Offset == N - 1 {
+				<- call
+				done <- true
 			}
+		}
+	}()
+	h := NewHandlerFromCsm(csm, topic, 100, 10, false)
+	r := R{
+		&String{"mot"}: func(ctx context.Context, p *account.Account) {
+			called++
+			go func(called int64) {
+				ct := common.FromGrpcCtx(ctx)
+				h.Commit(ct.GetPartition(), ct.GetOffset())
+				time.Sleep(time.Duration(N - called))
+			}(called)
 
-			cred := common.GetCredential(ctx)
-			if cred.GetClientId() != "client" {
-				t.Fatalf("should equal, got %s", cred.GetClientId())
+			if called == N {
+				go func() {
+					call <- true
+				}()
 			}
-			ok = true
 		},
-	})
-
-	r.Handle(&ctx, value)
-	if !ok {
-		t.Fatal("shoul be call")
 	}
+
+	go h.Serve(r)
+
+	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
+	for i := int64(0); i < N; i++ {
+		csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+	}
+	<-done
 }
 
-func BenchmarkRouter(b *testing.B) {
-	var ctx context.Context
-	r := kafka.NewRouter("", "", kafka.R{
-		kafka.Str("e128"): func(acc *account.Account) {
+func TestCommit(t *testing.T) {
+	N, called := int64(400), int64(0)
+	call, done := make(chan bool), make(chan bool)
+
+	topic := "mot"
+	csm := NewConsumerMock(4)
+	go func() {
+		for c := range csm.CommitChan() {
+			if c.Offset == N - 1 {
+				<- call
+				done <- true
+			}
+		}
+	}()
+	h := NewHandlerFromCsm(csm, topic, 100, 10, true)
+	r := R{
+		&String{"mot"}: func(ctx context.Context, p *account.Account) {
+			called++
+			if called == N {
+				go func() {
+					call <- true
+				}()
+			}
 		},
-	})
-	myacc := &account.Account{
-			Ctx: &compb.Context{
-				Topic: "e128",
-			},
-			Id: common.Ps("hv"),
-			Name: common.Ps("very long string, longer then short string"),
-			Address: common.Ps("a shorter string"),
-		}
-
-	value := common.Protify(myacc)
-
-	for n := 0; n < b.N; n++ {
-		r.Handle(&ctx, value)
 	}
-}
 
-func BenchmarkRouter2(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		var ctx context.Context
-		myacc := &account.Account{
-			Ctx: &compb.Context{
-				Topic: "e128",
-			},
-			Id: common.Ps("hv"),
-		}
+	go h.Serve(r)
 
-		value := common.Protify(myacc)
-		var m = map[fmt.Stringer]interface{} {
-			kafka.Str("e128"): func(acc *account.Account) {
-
-			},
-		}
-
-		if 0 == 1 {
-			println(value, m, ctx)
-		}
+	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
+	for i := int64(0); i < N; i++ {
+		csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
 	}
+	<-done
 }
