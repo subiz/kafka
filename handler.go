@@ -6,11 +6,10 @@ import (
 	cpb "bitbucket.org/subiz/header/common"
 	"bitbucket.org/subiz/map"
 	"bitbucket.org/subiz/squasher"
-	"errors"
 	"fmt"
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	proto "github.com/golang/protobuf/proto"
+	"github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -21,11 +20,19 @@ type handlerFunc struct {
 	function  reflect.Value
 }
 
+type Consumer interface {
+	MarkOffset(msg *sarama.ConsumerMessage, metadata string)
+	CommitOffsets() error
+	Messages() <-chan *sarama.ConsumerMessage
+	Notifications() <-chan *cluster.Notification
+	Errors() <-chan error
+	Close() error
+}
+
 type Handler struct {
-	consumer   *cluster.Consumer
+	consumer   Consumer
 	hs         map[string]handlerFunc
 	term       uint64
-	handler    map[string]ft
 	topic      string
 	exec       *executor.Executor
 	autocommit bool
@@ -37,14 +44,19 @@ type Job struct {
 	Term    uint64
 }
 
-func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
+func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
 	h := &Handler{
 		topic:      topic,
 		autocommit: autocommit,
-		consumer:   newHandlerConsumer(brokers, topic, csg),
+		consumer:   csm,
 	}
 	h.exec = executor.NewExecutor(maxworkers, maxlag, h.handleJob)
 	return h
+}
+
+func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
+	csm := newHandlerConsumer(brokers, topic, csg)
+	return NewHandlerFromCsm(csm, topic, maxworkers, maxlag, autocommit)
 }
 
 func callHandler(handler map[string]handlerFunc, val []byte, par int32, offset int64) error {
@@ -57,7 +69,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, par int32, offset i
 	pctx := payload.GetCtx()
 	hf := handler[pctx.GetTopic()]
 	if hf.paramType == nil {
-		return errors.New("wrong handler for topic" + pctx.GetTopic())
+		return fmt.Errorf("wrong handler for topic" + pctx.GetTopic())
 	}
 
 	// examize val to get data
@@ -98,14 +110,13 @@ func (h *Handler) Commit(partition int32, offset int64) {
 }
 
 func (h *Handler) handleJob(job executor.Job) {
-	j := job.Data.(*Job)
+	j := job.Data.(Job)
 	mes := j.Message
 
 	// ignore old term
 	if atomic.LoadUint64(&h.term) != j.Term {
 		return
 	}
-
 	if err := callHandler(h.hs, mes.Value, mes.Partition, mes.Offset); err != nil {
 		common.LogErr(err)
 		return
@@ -129,7 +140,7 @@ func (h *Handler) markSq(partition int32, offset int64) {
 func (h *Handler) commitloop(term uint64, par int32, offsetc <-chan int64) {
 	changed := false
 	for {
-		if atomic.LoadUint64(&h.term) == term {
+		if atomic.LoadUint64(&h.term) != term {
 			return // term changed, our term is outdated
 		}
 
@@ -175,6 +186,7 @@ func (h *Handler) Serve(handler R, cbs ...interface{}) {
 			if !more {
 				goto end
 			}
+
 			h.createSqIfNotExist(msg.Partition, msg.Offset)
 			h.exec.AddJob(executor.Job{
 				Key:  string(msg.Key),
@@ -190,17 +202,13 @@ func (h *Handler) Serve(handler R, cbs ...interface{}) {
 			if nh != nil {
 				nh(ntf.Current[h.topic])
 			}
-		case err, more := <-h.consumer.Errors():
-			if !more {
-				goto end
-			}
+		case err := <-h.consumer.Errors():
 			common.LogErr(err)
 		case <-EndSignal():
 			goto end
 		}
 	}
 end:
-	common.Log("STOPED==============================")
 	err := h.consumer.Close()
 	common.DieIf(err, -10, "unable to close consumer")
 }
