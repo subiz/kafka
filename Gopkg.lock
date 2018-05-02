@@ -11,7 +11,7 @@
   branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "bc25db94b20fa75c5f28ff7c2a195a755a467538"
+  revision = "028f58ed45e3099a792bec37728b484ba35e9388"
 
 [[projects]]
   branch = "master"
@@ -20,9 +20,10 @@
     "account",
     "auth",
     "common",
-    "lang"
+    "lang",
+    "payment"
   ]
-  revision = "4c53f991d123e88cbd6162cad24b1b79729e3874"
+  revision = "b196db84f8f255c10194e4649c75d175e3474c21"
 
 [[projects]]
   branch = "master"
@@ -88,7 +89,6 @@
     "ptypes/timestamp"
   ]
   revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-  version = "v1.1.0"
 
 [[projects]]
   branch = "master"
@@ -161,13 +161,13 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
+  revision = "640f4622ab692b87c2f3a94265e6f579fe38263d"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "4adea008a5e5f820b6028611ae0b6b3fbcec534b"
+  revision = "78d5f264b493f125018180c204871ecf58a2dce1"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -229,6 +229,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1c15348c6e5926fe46e098d3da6e7b10896423f0d8e987471cf1106fb5a8e59b"
+  inputs-digest = "b791f3c8073ab89417d00ce84ab43879485bdb28c338d1710b6c4f555983d6a4"
   solver-name = "gps-cdcl"
   solver-version = 1
