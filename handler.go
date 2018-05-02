@@ -216,7 +216,6 @@ end:
 func newHandlerConsumer(brokers []string, topic, csg string) *cluster.Consumer {
 	c := cluster.NewConfig()
 	c.Consumer.MaxWaitTime = 10000 * time.Millisecond
-	c.Consumer.Offsets.CommitInterval = -1 // commit manually
 	//c.Consumer.Offsets.Retention = 0
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
