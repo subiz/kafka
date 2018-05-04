@@ -69,7 +69,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, par int32, offset i
 	pctx := payload.GetCtx()
 	hf := handler[pctx.GetTopic()]
 	if hf.paramType == nil {
-		return fmt.Errorf("wrong handler for topic" + pctx.GetTopic())
+		return nil
 	}
 
 	// examize val to get data
