@@ -113,7 +113,7 @@ func TestCommitManually(t *testing.T) {
 			called++
 			go func(called int64) {
 				ct := common.FromGrpcCtx(ctx)
-				h.Commit(ct.GetPartition(), ct.GetOffset())
+				h.Commit(ct.GetTerm(), ct.GetPartition(), ct.GetOffset())
 				time.Sleep(time.Duration(N - called))
 			}(called)
 
@@ -125,7 +125,7 @@ func TestCommitManually(t *testing.T) {
 		},
 	}
 
-	go h.Serve(r)
+	go h.Serve(r, func([]int32){})
 
 	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
 	for i := int64(0); i < N; i++ {
@@ -160,11 +160,50 @@ func TestCommit(t *testing.T) {
 		},
 	}
 
-	go h.Serve(r)
+	go h.Serve(r, func([]int32){})
 
 	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
 	for i := int64(0); i < N; i++ {
 		csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+	}
+	<-done
+}
+
+func TestUnwantedTopics(t *testing.T) {
+	N, called := int64(400), int64(0)
+	call, done := make(chan bool), make(chan bool)
+
+	topic := "mot"
+	csm := NewConsumerMock(4)
+	go func() {
+		for c := range csm.CommitChan() {
+			if c.Offset == N - 1 {
+				<- call
+				done <- true
+			}
+		}
+	}()
+	h := NewHandlerFromCsm(csm, topic, 100, 10, true)
+	r := R{
+		&String{topic}: func(ctx context.Context, p *account.Account) {
+			called++
+			if called == N {
+				go func() {
+					call <- true
+				}()
+			}
+		},
+	}
+
+	go h.Serve(r, func([]int32){})
+
+	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
+	for i := int64(0); i < N; i++ {
+		if i % 2 == 0 {
+		csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+		} else {
+			csm.Publish(topic + "d", i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+		}
 	}
 	<-done
 }
