@@ -4,16 +4,17 @@ import (
 	"bitbucket.org/subiz/executor"
 	"bitbucket.org/subiz/gocommon"
 	cpb "bitbucket.org/subiz/header/common"
-	"bitbucket.org/subiz/map"
 	"bitbucket.org/subiz/squasher"
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 	"reflect"
-	"sync/atomic"
+	"sync"
 	"time"
 )
+
+var notfounderr = fmt.Errorf("handler_not_found")
 
 type handlerFunc struct {
 	paramType reflect.Type
@@ -30,18 +31,33 @@ type Consumer interface {
 }
 
 type Handler struct {
-	consumer   Consumer
-	hs         map[string]handlerFunc
-	term       uint64
-	topic      string
-	exec       *executor.Executor
+	lock *sync.Mutex
+	// topic is kafka topic
+	topic string
+
+	// consumer is kafka consumer
+	consumer Consumer
+
+	// hs map of topic -> func
+	hs map[string]handlerFunc
+
+	// term is  current kafka term, it alway increase
+	// and should equal number of kafka rebalances
+	term uint64
+
+	// exec is job balancer
+	exec *executor.Executor
+
+	// if set, commit automatically after handler func returned
 	autocommit bool
-	sqmap      cmap.Map
+
+	// sqmap is squasher per partition
+	sqmap map[int32]*squasher.Squasher
 }
 
 type Job struct {
-	Message *sarama.ConsumerMessage
-	Term    uint64
+	*sarama.ConsumerMessage
+	Term uint64
 }
 
 func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
@@ -49,6 +65,7 @@ func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, auto
 		topic:      topic,
 		autocommit: autocommit,
 		consumer:   csm,
+		lock:       &sync.Mutex{},
 	}
 	h.exec = executor.NewExecutor(maxworkers, maxlag, h.handleJob)
 	return h
@@ -59,7 +76,7 @@ func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, au
 	return NewHandlerFromCsm(csm, topic, maxworkers, maxlag, autocommit)
 }
 
-func callHandler(handler map[string]handlerFunc, val []byte, par int32, offset int64) error {
+func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64) error {
 	// examize val to get topic
 	payload := &cpb.Empty{}
 	if err := proto.Unmarshal(val, payload); err != nil {
@@ -69,18 +86,17 @@ func callHandler(handler map[string]handlerFunc, val []byte, par int32, offset i
 	pctx := payload.GetCtx()
 	hf := handler[pctx.GetTopic()]
 	if hf.paramType == nil {
-		return nil
+		return notfounderr
 	}
 
 	// examize val to get data
-	pptr := reflect.New(hf.paramType.Elem())
-	pptr.Elem().Set(reflect.Zero(hf.paramType.Elem()))
+	pptr := reflect.New(hf.paramType)
 	intef := pptr.Interface().(proto.Message)
 	if err := proto.Unmarshal(val, intef); err != nil {
 		return err
 	}
 
-	pctx.Offset, pctx.Partition = offset, par
+	pctx.Term, pctx.Offset, pctx.Partition = term, offset, par
 	ctxval := reflect.ValueOf(common.ToGrpcCtx(pctx))
 
 	hf.function.Call([]reflect.Value{ctxval, pptr})
@@ -91,68 +107,72 @@ func convertToHanleFunc(handlers R) map[string]handlerFunc {
 	rs := make(map[string]handlerFunc)
 	for k, v := range handlers {
 		f := reflect.ValueOf(v)
-		ptype := f.Type().In(1)
+		ptype := f.Type().In(1).Elem()
 
-		pptr := reflect.New(ptype.Elem())
-		_, ok := pptr.Interface().(proto.Message)
-		if !ok {
+		pptr := reflect.New(ptype)
+		if _, ok := pptr.Interface().(proto.Message); !ok {
 			panic("wrong handler for topic " + k.String() +
 				". The second param should be type of proto.Message")
 		}
-
 		rs[k.String()] = handlerFunc{paramType: ptype, function: f}
 	}
 	return rs
 }
 
-func (h *Handler) Commit(partition int32, offset int64) {
-	h.markSq(partition, offset)
+func (h *Handler) Commit(term uint64, partition int32, offset int64) {
+	if !h.correctTerm(term) {
+		return
+	}
+	h.lock.Lock()
+	sq := h.sqmap[partition]
+	h.lock.Unlock()
+
+	if sq != nil {
+		sq.Mark(offset)
+	}
 }
 
 func (h *Handler) handleJob(job executor.Job) {
-	j := job.Data.(Job)
-	mes := j.Message
-
-	// ignore old term
-	if atomic.LoadUint64(&h.term) != j.Term {
+	mes := job.Data.(Job)
+	if !h.correctTerm(mes.Term) {
 		return
 	}
-	if err := callHandler(h.hs, mes.Value, mes.Partition, mes.Offset); err != nil {
+
+	sq := h.createSqIfNotExist(mes.Partition, mes.Offset)
+	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset)
+	if err != nil && err != notfounderr {
 		common.LogErr(err)
 		return
 	}
 
-	if h.autocommit {
-		h.markSq(mes.Partition, mes.Offset)
+	if err != nil || h.autocommit {
+		sq.Mark(mes.Offset)
 	}
 }
 
-func (h *Handler) markSq(partition int32, offset int64) {
-	term := atomic.LoadUint64(&h.term)
-	sqi, ok := h.sqmap.Get(fmt.Sprintf("%d-%d", term, partition))
-	if !ok {
-		return
-	}
-	sq := sqi.(*squasher.Squasher)
-	sq.Mark(offset)
+func (h *Handler) correctTerm(term uint64) bool {
+	h.lock.Lock()
+	curterm := h.term
+	h.lock.Unlock()
+	return curterm == term
 }
 
-func (h *Handler) commitloop(term uint64, par int32, offsetc <-chan int64) {
+func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 	changed := false
 	for {
-		if atomic.LoadUint64(&h.term) != term {
-			return // term changed, our term is outdated
-		}
-
 		select {
-		case offset := <-offsetc:
-			h.consumer.MarkOffset(&sarama.ConsumerMessage{
-				Topic:     h.topic,
-				Offset:    offset,
-				Partition: par,
-			}, "")
+		case o := <-ofsc:
+			if !h.correctTerm(term) {
+				return
+			}
+			m := sarama.ConsumerMessage{Topic: h.topic, Offset: o, Partition: par}
+			h.consumer.MarkOffset(&m, "")
 			changed = true
 		case <-time.After(1 * time.Second):
+			if !h.correctTerm(term) {
+				return
+			}
+
 			if !changed {
 				break
 			}
@@ -162,55 +182,45 @@ func (h *Handler) commitloop(term uint64, par int32, offsetc <-chan int64) {
 	}
 }
 
-func (h *Handler) createSqIfNotExist(par int32, offset int64) {
-	term := atomic.LoadUint64(&h.term)
-	_, ok := h.sqmap.Get(fmt.Sprintf("%d-%d", term, par))
-	if ok {
-		return
+func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher {
+	h.lock.Lock()
+	sq := h.sqmap[par]
+	if sq == nil {
+		sq = squasher.NewSquasher(offset, 10000)
+		h.sqmap[par] = sq
+		go h.commitloop(h.term, par, sq.Next())
 	}
 
-	sq := squasher.NewSquasher(offset, 10000)
-	h.sqmap.Set(fmt.Sprintf("%d-%d", term, par), sq)
-	go h.commitloop(term, par, sq.Next())
+	h.lock.Unlock()
+	return sq
 }
 
-func (h *Handler) Serve(handler R, cbs ...interface{}) {
+func (h *Handler) Serve(handler R, nh func([]int32)) error {
 	h.hs = convertToHanleFunc(handler)
-	var nh func([]int32)
-	if len(cbs) > 0 {
-		nh = cbs[0].(func([]int32))
-	}
+loop:
 	for {
 		select {
 		case msg, more := <-h.consumer.Messages():
-			if !more {
-				goto end
+			if !more || msg == nil {
+				break loop
 			}
-
-			h.createSqIfNotExist(msg.Partition, msg.Offset)
-			h.exec.AddJob(executor.Job{
-				Key:  string(msg.Key),
-				Data: Job{Term: h.term, Message: msg},
-			})
-		case ntf, more := <-h.consumer.Notifications():
-			if !more {
-				goto end
-			}
-			atomic.AddUint64(&h.term, 1)
-			h.sqmap = cmap.New(100)
-
-			if nh != nil {
+			j := executor.Job{Key: string(msg.Key), Data: Job{msg, h.term}}
+			h.exec.AddJob(j)
+		case ntf := <-h.consumer.Notifications():
+			h.lock.Lock()
+			h.term++
+			h.sqmap = make(map[int32]*squasher.Squasher)
+			h.lock.Unlock()
+			if ntf != nil {
 				nh(ntf.Current[h.topic])
 			}
 		case err := <-h.consumer.Errors():
 			common.LogErr(err)
 		case <-EndSignal():
-			goto end
+			break loop
 		}
 	}
-end:
-	err := h.consumer.Close()
-	common.DieIf(err, -10, "unable to close consumer")
+	return h.consumer.Close()
 }
 
 func newHandlerConsumer(brokers []string, topic, csg string) *cluster.Consumer {
@@ -222,16 +232,12 @@ func newHandlerConsumer(brokers []string, topic, csg string) *cluster.Consumer {
 	c.Group.Session.Timeout = 20 * time.Second
 	c.Group.Return.Notifications = true
 
-	var err error
-	var consumer *cluster.Consumer
 	for {
-		consumer, err = cluster.NewConsumer(brokers, csg, []string{topic}, c)
-		if err != nil {
-			common.Log(err, "will retry...")
-			time.Sleep(3 * time.Second)
-			continue
+		csm, err := cluster.NewConsumer(brokers, csg, []string{topic}, c)
+		if err == nil {
+			return csm
 		}
-		break
+		common.Log(err, "will retry...")
+		time.Sleep(3 * time.Second)
 	}
-	return consumer
 }
