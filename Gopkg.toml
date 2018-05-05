@@ -39,10 +39,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/map"
-
-[[constraint]]
-  branch = "master"
   name = "bitbucket.org/subiz/squasher"
 
 [[constraint]]

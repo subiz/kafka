@@ -23,13 +23,7 @@
     "lang",
     "payment"
   ]
-  revision = "b196db84f8f255c10194e4649c75d175e3474c21"
-
-[[projects]]
-  branch = "master"
-  name = "bitbucket.org/subiz/map"
-  packages = ["."]
-  revision = "90875618b8ac943fd3e5afcfdcb594422f17d907"
+  revision = "a3fafaed53049adaa8f17a6739e021f3d37bde9b"
 
 [[projects]]
   branch = "master"
@@ -146,7 +140,7 @@
   branch = "master"
   name = "github.com/rcrowley/go-metrics"
   packages = ["."]
-  revision = "d932a24a8ccb8fcadc993e5c6c58f93dac168294"
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   branch = "master"
@@ -167,7 +161,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "78d5f264b493f125018180c204871ecf58a2dce1"
+  revision = "6f686a352de66814cdd080d970febae7767857a3"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -229,6 +223,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b791f3c8073ab89417d00ce84ab43879485bdb28c338d1710b6c4f555983d6a4"
+  inputs-digest = "ac3090df201e5453218427c16bda7f82d01ece7680e81df4726b82219f752c11"
   solver-name = "gps-cdcl"
   solver-version = 1
