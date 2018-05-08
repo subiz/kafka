@@ -80,6 +80,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	// examize val to get topic
 	payload := &cpb.Empty{}
 	if err := proto.Unmarshal(val, payload); err != nil {
+		common.Log("not valid")
 		return err
 	}
 
@@ -93,6 +94,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	pptr := reflect.New(hf.paramType)
 	intef := pptr.Interface().(proto.Message)
 	if err := proto.Unmarshal(val, intef); err != nil {
+		common.Log("router topic", pctx.GetTopic())
 		return err
 	}
 
@@ -141,8 +143,8 @@ func (h *Handler) handleJob(job executor.Job) {
 	sq := h.createSqIfNotExist(mes.Partition, mes.Offset)
 	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset)
 	if err != nil && err != notfounderr {
+		common.Logf("topic %s:%d[%d]", mes.Topic, mes.Partition, mes.Offset)
 		common.LogErr(err)
-		return
 	}
 
 	if err != nil || h.autocommit {
