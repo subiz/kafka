@@ -79,14 +79,14 @@ func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, au
 func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64) error {
 	// examize val to get topic
 	payload := &cpb.Empty{}
-	if err := proto.Unmarshal(val, payload); err != nil {
-		common.Log("not valid")
-		return err
+	topic, pctx := "", &cpb.Context{}
+	if err := proto.Unmarshal(val, payload); err == nil {
+		pctx = payload.GetCtx()
+		topic = pctx.GetTopic()
 	}
 
-	pctx := payload.GetCtx()
-	hf := handler[pctx.GetTopic()]
-	if hf.paramType == nil {
+	hf, ok := handler[topic]
+	if !ok || hf.paramType == nil {
 		return notfounderr
 	}
 
@@ -94,7 +94,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	pptr := reflect.New(hf.paramType)
 	intef := pptr.Interface().(proto.Message)
 	if err := proto.Unmarshal(val, intef); err != nil {
-		common.Log("router topic", pctx.GetTopic())
+		common.Logf("router topic %s:%d[%d] %v", topic, par, offset, val)
 		return err
 	}
 
@@ -116,7 +116,11 @@ func convertToHanleFunc(handlers R) map[string]handlerFunc {
 			panic("wrong handler for topic " + k.String() +
 				". The second param should be type of proto.Message")
 		}
-		rs[k.String()] = handlerFunc{paramType: ptype, function: f}
+		ks := ""
+		if k != nil && !reflect.ValueOf(k).IsNil() {
+			ks = k.String()
+		}
+		rs[ks] = handlerFunc{paramType: ptype, function: f}
 	}
 	return rs
 }
