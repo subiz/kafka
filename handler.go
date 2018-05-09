@@ -117,7 +117,7 @@ func convertToHanleFunc(handlers R) map[string]handlerFunc {
 				". The second param should be type of proto.Message")
 		}
 		ks := ""
-		if k != nil && !reflect.ValueOf(k).IsNil() {
+		if k != nil {
 			ks = k.String()
 		}
 		rs[ks] = handlerFunc{paramType: ptype, function: f}
