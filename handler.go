@@ -81,7 +81,9 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	payload := &cpb.Empty{}
 	topic, pctx := "", &cpb.Context{}
 	if err := proto.Unmarshal(val, payload); err == nil {
-		pctx = payload.GetCtx()
+		if p := payload.GetCtx(); p != nil {
+			pctx = p
+		}
 		topic = pctx.GetTopic()
 	} else {
 		common.Logf("invalid %s:%d[%d] %v", topic, par, offset, val)
