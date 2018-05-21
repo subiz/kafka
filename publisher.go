@@ -8,8 +8,9 @@ import (
 )
 
 type Publisher struct {
-	brokers  []string
-	producer sarama.SyncProducer
+	brokers        []string
+	producer       sarama.SyncProducer
+	hashedproducer sarama.SyncProducer
 }
 
 func NewPublisher(brokers []string) *Publisher {
@@ -23,7 +24,18 @@ func NewPublisher(brokers []string) *Publisher {
 		producer, err = sarama.NewSyncProducer(brokers, config)
 	}
 
-	return &Publisher{brokers: brokers, producer: producer}
+	config = sarama.NewConfig()
+	config.Producer.Partitioner = sarama.NewHashPartitioner
+
+	config.Producer.Return.Successes = true
+	hashedproducer, err := sarama.NewSyncProducer(brokers, config)
+	for err != nil {
+		fmt.Println("can't create sync producer to ", brokers, "retries in 5 sec")
+		time.Sleep(5 * time.Second)
+		producer, err = sarama.NewSyncProducer(brokers, config)
+	}
+
+	return &Publisher{brokers: brokers, producer: producer, hashedproducer: hashedproducer}
 }
 
 func (p *Publisher) Publish(topic string, data interface{}, par int32, key string) {
@@ -56,8 +68,12 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 		Value:     sarama.ByteEncoder(value),
 	}
 
+	prod := p.producer
+	if par == -1 {
+		prod = p.hashedproducer
+	}
 	for {
-		if _, _, err = p.producer.SendMessage(msg); err != nil {
+		if _, _, err = prod.SendMessage(msg); err != nil {
 			break
 		}
 		fmt.Println(err)
