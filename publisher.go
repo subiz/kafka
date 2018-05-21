@@ -73,7 +73,7 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 		prod = p.hashedproducer
 	}
 	for {
-		if _, _, err = prod.SendMessage(msg); err != nil {
+		if _, _, err = prod.SendMessage(msg); err == nil {
 			break
 		}
 		fmt.Println(err)
