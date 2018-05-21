@@ -13,7 +13,8 @@ metadata:
   name: kafka-0
 subsets:
 - addresses:
-  - ip: 104.199.179.26
+  - ip: 35.234.30.92
+  #- ip: 104.199.179.26
   # - ip: 192.168.5.218
   ports:
   - port: 9092
