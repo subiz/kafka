@@ -6,7 +6,7 @@ import (
 	"bitbucket.org/subiz/header/lang"
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
-	proto "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"log"
 	"os"
 	"os/signal"
