@@ -167,6 +167,10 @@ func (h *Handler) correctTerm(term uint64) bool {
 	return curterm == term
 }
 
+func (h *Handler) GetTerm() uint64 {
+	return h.term
+}
+
 func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 	changed := false
 	for {
