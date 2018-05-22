@@ -77,7 +77,7 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 			break
 		}
 		fmt.Println(err)
-		fmt.Printf("unable to publist message, topic: %s, data: %v\n", topic, data)
+		fmt.Printf("unable to publist message, topic: %s, partition %d, key %s, data: %v\n", topic, par, key, data)
 		fmt.Println("retrying after 5sec")
 		time.Sleep(5 * time.Second)
 	}
