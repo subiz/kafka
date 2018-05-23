@@ -31,7 +31,7 @@ type Consumer interface {
 }
 
 type Handler struct {
-	lock *sync.Mutex
+	*sync.RWMutex
 	// topic is kafka topic
 	topic string
 
@@ -62,10 +62,10 @@ type Job struct {
 
 func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
 	h := &Handler{
+		RWMutex:    &sync.RWMutex{},
 		topic:      topic,
 		autocommit: autocommit,
 		consumer:   csm,
-		lock:       &sync.Mutex{},
 	}
 	h.exec = executor.NewExecutor(maxworkers, maxlag, h.handleJob)
 	return h
@@ -109,7 +109,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	return nil
 }
 
-func convertToHanleFunc(handlers R) map[string]handlerFunc {
+func convertToHandleFunc(handlers R) map[string]handlerFunc {
 	rs := make(map[string]handlerFunc)
 	for k, v := range handlers {
 		f := reflect.ValueOf(v)
@@ -130,12 +130,13 @@ func convertToHanleFunc(handlers R) map[string]handlerFunc {
 }
 
 func (h *Handler) Commit(term uint64, partition int32, offset int64) {
-	if !h.correctTerm(term) {
+	h.RLock()
+	if h.term != term {
+		h.RUnlock()
 		return
 	}
-	h.lock.Lock()
 	sq := h.sqmap[partition]
-	h.lock.Unlock()
+	h.RUnlock()
 
 	if sq != nil {
 		sq.Mark(offset)
@@ -144,11 +145,14 @@ func (h *Handler) Commit(term uint64, partition int32, offset int64) {
 
 func (h *Handler) handleJob(job executor.Job) {
 	mes := job.Data.(Job)
-	if !h.correctTerm(mes.Term) {
+	h.Lock()
+	if h.term != mes.Term {
+		h.Unlock()
 		return
 	}
 
 	sq := h.createSqIfNotExist(mes.Partition, mes.Offset)
+	h.Unlock()
 	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset)
 	if err != nil && err != notfounderr {
 		common.Logf("topic %s:%d[%d]", mes.Topic, mes.Partition, mes.Offset)
@@ -160,63 +164,58 @@ func (h *Handler) handleJob(job executor.Job) {
 	}
 }
 
-func (h *Handler) correctTerm(term uint64) bool {
-	h.lock.Lock()
-	curterm := h.term
-	h.lock.Unlock()
-	return curterm == term
-}
-
 func (h *Handler) GetTerm() uint64 {
+	h.RLock()
+	defer h.RUnlock()
 	return h.term
 }
 
 func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
-	changed := false
+	changed, t := false, time.NewTicker(1*time.Second)
 	for {
 		select {
 		case o := <-ofsc:
-			if !h.correctTerm(term) {
+			h.RLock()
+			if h.term != term {
+				h.RUnlock()
 				return
 			}
 			m := sarama.ConsumerMessage{Topic: h.topic, Offset: o, Partition: par}
 			h.consumer.MarkOffset(&m, "")
 			changed = true
-		case <-time.After(1 * time.Second):
-			if !h.correctTerm(term) {
+			h.RUnlock()
+		case <-t.C:
+			h.RLock()
+			if h.term != term {
+				h.RUnlock()
 				return
 			}
-
-			if !changed {
-				break
+			if sq := h.sqmap[par]; sq != nil {
+				fmt.Println("Handle status ", h.term, par, sq.GetStatus())
 			}
-			h.consumer.CommitOffsets()
-			changed = false
+
+			if changed {
+				h.consumer.CommitOffsets()
+				changed = false
+			}
+			h.RUnlock()
 		}
 	}
 }
 
 func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher {
-	h.lock.Lock()
-	sq := h.sqmap[par]
-	if sq == nil {
-		sq = squasher.NewSquasher(offset, 10000)
-		h.sqmap[par] = sq
-		go h.commitloop(h.term, par, sq.Next())
-		go func() {
-			for {
-				fmt.Println("Handle status ", h.term, par, sq.GetStatus())
-				time.Sleep(1 * time.Second)
-			}
-		}()
+	if sq := h.sqmap[par]; sq != nil {
+		return sq
 	}
 
-	h.lock.Unlock()
+	sq := squasher.NewSquasher(offset, 10000)
+	h.sqmap[par] = sq
+	go h.commitloop(h.term, par, sq.Next())
 	return sq
 }
 
 func (h *Handler) Serve(handler R, nh func([]int32)) error {
-	h.hs = convertToHanleFunc(handler)
+	h.hs = convertToHandleFunc(handler)
 loop:
 	for {
 		select {
@@ -227,13 +226,17 @@ loop:
 			j := executor.Job{Key: string(msg.Key), Data: Job{msg, h.term}}
 			h.exec.AddJob(j)
 		case ntf := <-h.consumer.Notifications():
-			h.lock.Lock()
+			if ntf == nil {
+				break loop
+			}
+			h.Lock()
 			h.term++
 			h.sqmap = make(map[int32]*squasher.Squasher)
-			h.lock.Unlock()
-			if ntf != nil {
+			func() {
+				defer func() { recover() }()
 				nh(ntf.Current[h.topic])
-			}
+			}()
+			h.Unlock()
 		case err := <-h.consumer.Errors():
 			common.LogErr(err)
 		case <-EndSignal():
