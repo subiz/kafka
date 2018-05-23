@@ -29,7 +29,7 @@
   branch = "master"
   name = "bitbucket.org/subiz/squasher"
   packages = ["."]
-  revision = "17bb18d45dcc5d8fe858e3f702aa6fbac5b26fcf"
+  revision = "773693e5a63456d402ca8eb6e74a088edface7c3"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
