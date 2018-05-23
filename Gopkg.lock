@@ -11,7 +11,7 @@
   branch = "master"
   name = "bitbucket.org/subiz/gocommon"
   packages = ["."]
-  revision = "fc36456d8ec2870cf635c537e16f9d2546ad2a41"
+  revision = "252671e36846571e3f4f52c60f1a9deae4a42c88"
 
 [[projects]]
   branch = "master"
@@ -23,13 +23,13 @@
     "lang",
     "payment"
   ]
-  revision = "c95077321b78cba96bbeaa49c80cf32dbef201c2"
+  revision = "f3f88b4f302c12d2fc338100ae8f91324a9a9873"
 
 [[projects]]
   branch = "master"
   name = "bitbucket.org/subiz/squasher"
   packages = ["."]
-  revision = "e6d61c48910506d981ba851200c9ded5f42c48e2"
+  revision = "17bb18d45dcc5d8fe858e3f702aa6fbac5b26fcf"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -70,8 +70,8 @@
 [[projects]]
   name = "github.com/fatih/color"
   packages = ["."]
-  revision = "507f6050b8568533fb3f5504de8e5205fa62a114"
-  version = "v1.6.0"
+  revision = "5b77d2a35fb0ede96d138fc9a99f5c9b6aef11b4"
+  version = "v1.7.0"
 
 [[projects]]
   branch = "master"
@@ -83,13 +83,13 @@
     "ptypes/duration",
     "ptypes/timestamp"
   ]
-  revision = "927b65914520a8b7d44f5c9057611cfec6b2e2d0"
+  revision = "3a3da3a4e26776cc22a79ef46d5d58477532dede"
 
 [[projects]]
   branch = "master"
   name = "github.com/golang/snappy"
   packages = ["."]
-  revision = "553a641470496b2327abcac10b36396bd98e45c9"
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
   name = "github.com/gorilla/schema"
@@ -155,13 +155,13 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "2491c5de3490fced2f6cff376127c667efeed857"
+  revision = "9ef9f5bb98a1fdc41f8cf6c250a4404b4085e389"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "d0faeb539838e250bd0a9db4182d48d4a1915181"
+  revision = "88eb85aaee56831ad49eaf7aa80d73de9814cde2"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -188,7 +188,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "86e600f69ee4704c6efbf6a2a40a5c10700e76c2"
+  revision = "11a468237815f3a3ddf9f7c6e8b6b3b382a24d15"
 
 [[projects]]
   name = "google.golang.org/grpc"

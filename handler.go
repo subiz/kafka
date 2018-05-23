@@ -203,6 +203,12 @@ func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher
 		sq = squasher.NewSquasher(offset, 10000)
 		h.sqmap[par] = sq
 		go h.commitloop(h.term, par, sq.Next())
+		go func() {
+			for {
+				fmt.Println("Handle status ", h.term, par, sq.GetStatus())
+				time.Sleep(1 * time.Second)
+			}
+		}()
 	}
 
 	h.lock.Unlock()
