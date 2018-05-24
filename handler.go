@@ -129,6 +129,7 @@ func convertToHandleFunc(handlers R) map[string]handlerFunc {
 	return rs
 }
 
+// do not call commit in nh function, it will cause deadlock
 func (h *Handler) Commit(term uint64, partition int32, offset int64) {
 	h.RLock()
 	if h.term != term {
@@ -164,11 +165,7 @@ func (h *Handler) handleJob(job executor.Job) {
 	}
 }
 
-func (h *Handler) GetTerm() uint64 {
-	h.RLock()
-	defer h.RUnlock()
-	return h.term
-}
+func (h *Handler) GetTerm() uint64 { return h.term }
 
 func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 	changed, t := false, time.NewTicker(1*time.Second)
