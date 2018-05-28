@@ -177,10 +177,10 @@ func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 				h.RUnlock()
 				return
 			}
+			h.RUnlock()
+			changed = true
 			m := sarama.ConsumerMessage{Topic: h.topic, Offset: o, Partition: par}
 			h.consumer.MarkOffset(&m, "")
-			changed = true
-			h.RUnlock()
 		case <-t.C:
 			h.RLock()
 			if h.term != term {
@@ -190,12 +190,11 @@ func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 			if sq := h.sqmap[par]; sq != nil {
 				fmt.Println("Handle status ", h.term, par, sq.GetStatus())
 			}
-
+			h.RUnlock()
 			if changed {
 				h.consumer.CommitOffsets()
 				changed = false
 			}
-			h.RUnlock()
 		}
 	}
 }
