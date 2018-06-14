@@ -204,7 +204,7 @@ func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher
 		return sq
 	}
 
-	sq := squasher.NewSquasher(offset, 10000)
+	sq := squasher.NewSquasher(offset, 1000000) // 1M
 	h.sqmap[par] = sq
 	go h.commitloop(h.term, par, sq.Next())
 	return sq
