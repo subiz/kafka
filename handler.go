@@ -53,6 +53,8 @@ type Handler struct {
 
 	// sqmap is squasher per partition
 	sqmap map[int32]*squasher.Squasher
+
+	squashercap uint
 }
 
 type Job struct {
@@ -62,10 +64,11 @@ type Job struct {
 
 func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
 	h := &Handler{
-		RWMutex:    &sync.RWMutex{},
-		topic:      topic,
-		autocommit: autocommit,
-		consumer:   csm,
+		RWMutex:     &sync.RWMutex{},
+		topic:       topic,
+		autocommit:  autocommit,
+		consumer:    csm,
+		squashercap: maxworkers * maxlag * 2,
 	}
 	h.exec = executor.NewExecutor(maxworkers, maxlag, h.handleJob)
 	return h
@@ -205,7 +208,7 @@ func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher
 		return sq
 	}
 
-	sq := squasher.NewSquasher(offset, 1000000) // 1M
+	sq := squasher.NewSquasher(offset, int32(h.squashercap)) // 1M
 	h.sqmap[par] = sq
 	go h.commitloop(h.term, par, sq.Next())
 	return sq
