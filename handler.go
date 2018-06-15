@@ -130,18 +130,19 @@ func convertToHandleFunc(handlers R) map[string]handlerFunc {
 }
 
 // do not call commit in nh function, it will cause deadlock
-func (h *Handler) Commit(term uint64, partition int32, offset int64) {
+func (h *Handler) Commit(term uint64, partition int32, offset int64) error {
 	h.RLock()
 	if h.term != term {
 		h.RUnlock()
-		return
+		return nil
 	}
 	sq := h.sqmap[partition]
 	h.RUnlock()
 
 	if sq != nil {
-		sq.Mark(offset)
+		return sq.Mark(offset)
 	}
+	return nil
 }
 
 func (h *Handler) handleJob(job executor.Job) {
