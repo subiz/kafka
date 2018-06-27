@@ -1,34 +1,38 @@
 package kafka
 
 import (
-	"bitbucket.org/subiz/gocommon"
-	commonpb "bitbucket.org/subiz/header/common"
-	"bitbucket.org/subiz/header/lang"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"github.com/golang/protobuf/proto"
 	"log"
 	"os"
 	"os/signal"
 	"regexp"
 	"strings"
 	"time"
+
+	common "bitbucket.org/subiz/gocommon"
+	commonpb "bitbucket.org/subiz/header/common"
+	"bitbucket.org/subiz/header/lang"
+	"github.com/Shopify/sarama"
+	cluster "github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
 )
 
 var partitioner = sarama.NewHashPartitioner("")
 
 // EventStore publish and listen to kafka events
 type EventStore struct {
-	consumer *cluster.Consumer
-	producer sarama.SyncProducer
-	stopchan chan bool
-	cg       string
-	brokers  []string
+	consumer      *cluster.Consumer
+	producer      sarama.SyncProducer
+	asyncProducer sarama.AsyncProducer
+	stopchan      chan bool
+	cg            string
+	brokers       []string
 }
 
 // Close clean resource
 func (me EventStore) Close() {
 	err := me.producer.Close()
+	common.LogErr(err)
+	err = me.asyncProducer.Close()
 	common.LogErr(err)
 }
 
@@ -39,6 +43,17 @@ func newProducer(brokers []string) sarama.SyncProducer {
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	common.DieIf(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
+
+	return producer
+}
+
+func newAsyncProducer(brokers []string) sarama.AsyncProducer {
+	config := sarama.NewConfig()
+	config.Producer.Partitioner = sarama.NewHashPartitioner
+	config.Producer.Return.Successes = true
+	// config.Producer.RequireAcks = sarama.WaitForAll
+	producer, err := sarama.NewAsyncProducer(brokers, config)
+	common.DieIf(err, lang.T_kafka_error, "unable to create async producer with brokers %v", brokers)
 
 	return producer
 }
@@ -57,6 +72,8 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string, fr
 	me.cg = consumergroup
 	me.stopchan = make(chan bool)
 	me.producer = newProducer(brokers)
+	me.asyncProducer = newAsyncProducer(brokers)
+	go me.listenAsyncProducerErrors()
 }
 
 func validateTopicName(topic string) bool {
@@ -76,6 +93,27 @@ func (me EventStore) PublishT(ctx commonpb.Context, topic string, data interface
 // data must be type of []byte or proto.Message or string
 // string will be encode using encoding/gob
 func (me EventStore) Publish(topic string, data interface{}, key string) (partition int32, offset int64) {
+	msg := createMessage(topic, data, key)
+	for {
+		var err error
+		partition, offset, err = me.producer.SendMessage(&msg)
+		if err == nil {
+			break
+		}
+		common.LogErr(err)
+		common.Log("unable to publish message, topic: %s, data: %v", topic, data)
+		common.Log("retrying after 5sec")
+		time.Sleep(5 * time.Second)
+	}
+	return partition, offset
+}
+
+func (me *EventStore) AsyncPublish(topic string, data interface{}, key string) {
+	msg := createMessage(topic, data, key)
+	me.asyncProducer.Input() <- &msg
+}
+
+func createMessage(topic string, data interface{}, key string) sarama.ProducerMessage {
 	var value []byte
 	// convert value from proto.message or string to []byte
 	if data == nil {
@@ -98,17 +136,7 @@ func (me EventStore) Publish(topic string, data interface{}, key string) (partit
 
 	msg := prepareMessage(key, topic)
 	msg.Value = sarama.ByteEncoder(value)
-	for {
-		partition, offset, err = me.producer.SendMessage(&msg)
-		if err == nil {
-			break
-		}
-		common.LogErr(err)
-		common.Log("unable to publist message, topic: %s, data: %v", topic, data)
-		common.Log("retrying after 5sec")
-		time.Sleep(5 * time.Second)
-	}
-	return partition, offset
+	return msg
 }
 
 func prepareMessage(key, topic string) sarama.ProducerMessage {
@@ -284,4 +312,11 @@ func HashKeyToPar(N int, key string) int32 {
 	par, err := partitioner.Partition(&sarama.ProducerMessage{}, int32(N))
 	common.DieIf(err, lang.T_kafka_error, "unable to hash key %s to partition", key)
 	return par
+}
+
+func (me *EventStore) listenAsyncProducerErrors() {
+	for err := range me.asyncProducer.Errors() {
+		common.Logf("async publish message error: %s", err)
+		common.LogErr(err)
+	}
 }
