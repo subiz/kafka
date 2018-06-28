@@ -31,7 +31,7 @@
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/gocommon"
+  name = "bitbucket.org/subiz/goutils"
 
 [[constraint]]
   branch = "master"
