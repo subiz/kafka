@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"bitbucket.org/subiz/header/lang"
 )
 
 var partitioner = sarama.NewHashPartitioner("")
@@ -205,7 +204,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 				goto end
 			}
 			if err != nil {
-				log.Error(err)
+				log.Println("kafka err", err)
 			}
 		case <-EndSignal():
 			goto end
@@ -259,7 +258,7 @@ func newConsumer(brokers, topics []string, consumergroup string, frombegin bool)
 	for {
 		consumer, err = cluster.NewConsumer(brokers, consumergroup, topics, c)
 		if err != nil {
-			log.Info(err, "will retry...")
+			log.Println(err, "will retry...")
 			time.Sleep(3 * time.Second)
 			continue
 		}
