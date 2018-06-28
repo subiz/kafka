@@ -1,7 +1,7 @@
 package kafka
 
 import (
-	"bitbucket.org/subiz/gocommon"
+	"bitbucket.org/subiz/goutils/grpc"
 	"bitbucket.org/subiz/header/account"
 	cpb "bitbucket.org/subiz/header/common"
 	"context"
@@ -20,9 +20,7 @@ type String struct {
 	s string
 }
 
-func (s String) String() string {
-	return s.s
-}
+func (s String) String() string { return s.s }
 
 type ConsumerMock struct {
 	mes    chan *sarama.ConsumerMessage
@@ -65,9 +63,7 @@ func (c *ConsumerMock) MarkOffset(msg *sarama.ConsumerMessage, metadata string) 
 	c.commit <- msg
 }
 
-func (c *ConsumerMock) CommitOffsets() error {
-	return nil
-}
+func (c *ConsumerMock) CommitOffsets() error { return nil }
 
 func (c *ConsumerMock) Messages() <-chan *sarama.ConsumerMessage {
 	return c.mes
@@ -81,9 +77,7 @@ func (c *ConsumerMock) Errors() <-chan error {
 	return make(chan error, 0)
 }
 
-func (c *ConsumerMock) Close() error {
-	return nil
-}
+func (c *ConsumerMock) Close() error { return nil }
 
 func createMsg(topic, name string) *account.Account {
 	a := &account.Account{
@@ -101,8 +95,8 @@ func TestCommitManually(t *testing.T) {
 	csm := NewConsumerMock(4)
 	go func() {
 		for c := range csm.CommitChan() {
-			if c.Offset == N - 1 {
-				<- call
+			if c.Offset == N-1 {
+				<-call
 				done <- true
 			}
 		}
@@ -112,7 +106,7 @@ func TestCommitManually(t *testing.T) {
 		&String{"mot"}: func(ctx context.Context, p *account.Account) {
 			called++
 			go func(called int64) {
-				ct := common.FromGrpcCtx(ctx)
+				ct := grpc.FromGrpcCtx(ctx)
 				h.Commit(ct.GetTerm(), ct.GetPartition(), ct.GetOffset())
 				time.Sleep(time.Duration(N - called))
 			}(called)
@@ -125,7 +119,7 @@ func TestCommitManually(t *testing.T) {
 		},
 	}
 
-	go h.Serve(r, func([]int32){})
+	go h.Serve(r, func([]int32) {})
 
 	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
 	for i := int64(0); i < N; i++ {
@@ -142,8 +136,8 @@ func TestCommit(t *testing.T) {
 	csm := NewConsumerMock(4)
 	go func() {
 		for c := range csm.CommitChan() {
-			if c.Offset == N - 1 {
-				<- call
+			if c.Offset == N-1 {
+				<-call
 				done <- true
 			}
 		}
@@ -160,7 +154,7 @@ func TestCommit(t *testing.T) {
 		},
 	}
 
-	go h.Serve(r, func([]int32){})
+	go h.Serve(r, func([]int32) {})
 
 	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
 	for i := int64(0); i < N; i++ {
@@ -177,8 +171,8 @@ func TestUnwantedTopics(t *testing.T) {
 	csm := NewConsumerMock(4)
 	go func() {
 		for c := range csm.CommitChan() {
-			if c.Offset == N - 1 {
-				<- call
+			if c.Offset == N-1 {
+				<-call
 				done <- true
 			}
 		}
@@ -195,14 +189,14 @@ func TestUnwantedTopics(t *testing.T) {
 		},
 	}
 
-	go h.Serve(r, func([]int32){})
+	go h.Serve(r, func([]int32) {})
 
 	csm.Notify(map[string][]int32{topic: []int32{0, 1, 2}})
 	for i := int64(0); i < N; i++ {
-		if i % 2 == 0 {
-		csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+		if i%2 == 0 {
+			csm.Publish(topic, i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
 		} else {
-			csm.Publish(topic + "d", i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
+			csm.Publish(topic+"d", i, "a", createMsg(topic, fmt.Sprintf("%d", i)))
 		}
 	}
 	<-done

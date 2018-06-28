@@ -1,19 +1,18 @@
 package kafka
 
 import (
+	commonpb "bitbucket.org/subiz/header/common"
+	"fmt"
 	"log"
+	"github.com/Shopify/sarama"
+	cluster "github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
 	"os"
 	"os/signal"
 	"regexp"
 	"strings"
 	"time"
-
-	common "bitbucket.org/subiz/gocommon"
-	commonpb "bitbucket.org/subiz/header/common"
 	"bitbucket.org/subiz/header/lang"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"github.com/golang/protobuf/proto"
 )
 
 var partitioner = sarama.NewHashPartitioner("")
@@ -30,10 +29,12 @@ type EventStore struct {
 
 // Close clean resource
 func (me EventStore) Close() {
-	err := me.producer.Close()
-	common.LogErr(err)
-	err = me.asyncProducer.Close()
-	common.LogErr(err)
+	if err := me.producer.Close(); err != nil {
+		log.Println("kafka producer close error", err)
+	}
+	if err := me.asyncProducer.Close(); err != nil {
+		log.Println("kafka async close error", err)
+	}
 }
 
 func newProducer(brokers []string) sarama.SyncProducer {
@@ -42,8 +43,9 @@ func newProducer(brokers []string) sarama.SyncProducer {
 	config.Producer.Return.Successes = true
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewSyncProducer(brokers, config)
-	common.DieIf(err, lang.T_kafka_error, "unable to create producer with brokers %v", brokers)
-
+	if err != nil {
+		panic(fmt.Sprintf("unable to create producer with brokers %v", brokers))
+	}
 	return producer
 }
 
@@ -53,8 +55,9 @@ func newAsyncProducer(brokers []string) sarama.AsyncProducer {
 	config.Producer.Return.Successes = true
 	// config.Producer.RequireAcks = sarama.WaitForAll
 	producer, err := sarama.NewAsyncProducer(brokers, config)
-	common.DieIf(err, lang.T_kafka_error, "unable to create async producer with brokers %v", brokers)
-
+	if err != nil {
+		log.Fatalf("unable to create async producer with brokers %v", brokers)
+	}
 	return producer
 }
 
@@ -100,9 +103,9 @@ func (me EventStore) Publish(topic string, data interface{}, key string) (partit
 		if err == nil {
 			break
 		}
-		common.LogErr(err)
-		common.Log("unable to publish message, topic: %s, data: %v", topic, data)
-		common.Log("retrying after 5sec")
+		log.Println(err)
+		log.Printf("unable to publist message, topic: %s, data: %v\n", topic, data)
+		log.Println("retrying after 5sec")
 		time.Sleep(5 * time.Second)
 	}
 	return partition, offset
@@ -117,21 +120,21 @@ func createMessage(topic string, data interface{}, key string) sarama.ProducerMe
 	var value []byte
 	// convert value from proto.message or string to []byte
 	if data == nil {
-		panic(common.New500(lang.T_empty, "value is nil"))
+		panic("value is nil")
 	}
 	var err error
 	switch data := data.(type) {
 	case proto.Message:
 		value, err = proto.Marshal(data)
 		if err != nil {
-			panic(common.New500(lang.T_wrong_type, "unable to protify struct %v", data))
+			panic(fmt.Sprintf("unable to protify struct %v", data))
 		}
 	case []byte:
 		value = data
 	case string:
 		value = []byte(data)
 	default:
-		panic(common.New500(lang.T_wrong_type, "value should be type of proto.Message, []byte or string, got %v", data))
+		panic(fmt.Sprintf("value should be type of proto.Message, []byte or string, got %v", data))
 	}
 
 	msg := prepareMessage(key, topic)
@@ -164,51 +167,8 @@ func (me EventStore) MarkOffset(topic string, par int32, offset int64) {
 	}, "")
 }
 
-// Peek just like Listen but do not commit
-func (me EventStore) Peek(h func(string, int32, int64, []byte) bool, cbs ...interface{}) {
-	defer common.Recover()
-	var nh func(map[string][]int32)
-	if len(cbs) > 0 {
-		nh = cbs[0].(func(map[string][]int32))
-	}
-
-	for {
-		select {
-		case msg, more := <-me.consumer.Messages():
-			if !more {
-				goto end
-			}
-			if false == func() bool { // don't allow this function die
-				defer common.Recover()
-				return h(msg.Topic, msg.Partition, msg.Offset, msg.Value)
-			}() {
-				goto end
-			}
-		case ntf, more := <-me.consumer.Notifications():
-			if !more {
-				goto end
-			}
-			if nh != nil {
-				nh(ntf.Current)
-			}
-		case err, more := <-me.consumer.Errors():
-			if !more {
-				goto end
-			}
-			common.LogErr(err)
-		case <-EndSignal():
-			goto end
-		}
-	}
-end:
-	common.Log("STOPED==============================")
-	err := me.consumer.Close()
-	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
-}
-
 // Listen start listening kafka consumer
 func (me EventStore) Listen(h func(partition int32, topic string, value []byte, offset int64) bool, cbs ...interface{}) {
-	defer common.Recover()
 	var nh func(map[string][]int32)
 	if len(cbs) > 0 {
 		nh = cbs[0].(func(map[string][]int32))
@@ -221,7 +181,11 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 				goto end
 			}
 			out := func() bool { // don't allow this function die
-				defer common.Recover()
+				defer func() {
+					if r := recover(); r != nil {
+						log.Println(r)
+					}
+				}()
 				return h(msg.Partition, msg.Topic, msg.Value, msg.Offset)
 			}()
 
@@ -240,15 +204,18 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 			if !more {
 				goto end
 			}
-			common.LogErr(err)
+			if err != nil {
+				log.Error(err)
+			}
 		case <-EndSignal():
 			goto end
 		}
 	}
 end:
-	common.Log("STOPED==============================")
-	err := me.consumer.Close()
-	common.DieIf(err, lang.T_kafka_error, "unable to close consumer")
+	log.Println("STOPED==============================")
+	if err := me.consumer.Close(); err != nil {
+		panic(fmt.Sprintf("unable to close consumer: %v", err))
+	}
 }
 
 func (me *EventStore) CloseConsumer() {
@@ -271,7 +238,7 @@ func newConsumer(brokers, topics []string, consumergroup string, frombegin bool)
 	for i := range topics {
 		topics[i] = strings.TrimSpace(topics[i])
 		if !validateTopicName(topics[i]) {
-			panic(common.New500(lang.T_invalid_kafka_topic, "topic is not valid, %v", topics[i]))
+			panic(fmt.Sprintf("topic is not valid, %v", topics[i]))
 		}
 	}
 	c := cluster.NewConfig()
@@ -292,7 +259,7 @@ func newConsumer(brokers, topics []string, consumergroup string, frombegin bool)
 	for {
 		consumer, err = cluster.NewConsumer(brokers, consumergroup, topics, c)
 		if err != nil {
-			common.Log(err, "will retry...")
+			log.Info(err, "will retry...")
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -310,13 +277,15 @@ func EndSignal() chan os.Signal {
 
 func HashKeyToPar(N int, key string) int32 {
 	par, err := partitioner.Partition(&sarama.ProducerMessage{}, int32(N))
-	common.DieIf(err, lang.T_kafka_error, "unable to hash key %s to partition", key)
+	if err != nil {
+		panic(fmt.Sprintf("unable to hash key %s to partition", key))
+	}
 	return par
 }
 
 func (me *EventStore) listenAsyncProducerErrors() {
 	for err := range me.asyncProducer.Errors() {
-		common.Logf("async publish message error: %s", err)
-		common.LogErr(err)
+		log.Printf("async publish message error: %s\n", err)
+		log.Println(err)
 	}
 }

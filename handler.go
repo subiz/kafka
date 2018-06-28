@@ -2,17 +2,20 @@ package kafka
 
 import (
 	"bitbucket.org/subiz/executor"
-	"bitbucket.org/subiz/gocommon"
+	"bitbucket.org/subiz/goutils/grpc"
 	cpb "bitbucket.org/subiz/header/common"
 	"bitbucket.org/subiz/squasher"
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
+	"log"
 	"reflect"
 	"sync"
 	"time"
 )
+
+type R map[fmt.Stringer]interface{}
 
 var notfounderr = fmt.Errorf("handler_not_found")
 
@@ -89,7 +92,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 		}
 		topic = pctx.GetTopic()
 	} else {
-		common.Logf("invalid %s:%d[%d] %v", topic, par, offset, val)
+		log.Printf("invalid %s:%d[%d] %v\n", topic, par, offset, val)
 	}
 
 	hf, ok := handler[topic]
@@ -101,12 +104,12 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 	pptr := reflect.New(hf.paramType)
 	intef := pptr.Interface().(proto.Message)
 	if err := proto.Unmarshal(val, intef); err != nil {
-		common.Logf("router topic %s:%d[%d] %v", topic, par, offset, val)
+		log.Printf("router topic %s:%d[%d] %v\n", topic, par, offset, val)
 		return err
 	}
 
 	pctx.Term, pctx.Offset, pctx.Partition = term, offset, par
-	ctxval := reflect.ValueOf(common.ToGrpcCtx(pctx))
+	ctxval := reflect.ValueOf(grpc.ToGrpcCtx(pctx))
 
 	hf.function.Call([]reflect.Value{ctxval, pptr})
 	return nil
@@ -160,8 +163,8 @@ func (h *Handler) handleJob(job executor.Job) {
 	h.Unlock()
 	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset)
 	if err != nil && err != notfounderr {
-		common.Logf("topic %s:%d[%d]", mes.Topic, mes.Partition, mes.Offset)
-		common.LogErr(err)
+		log.Printf("topic %s:%d[%d]\n", mes.Topic, mes.Partition, mes.Offset)
+		log.Println(err)
 	}
 
 	if err != nil || h.autocommit {
@@ -238,7 +241,9 @@ loop:
 			}()
 			h.Unlock()
 		case err := <-h.consumer.Errors():
-			common.LogErr(err)
+			if err != nil {
+				log.Println("kafka error", err)
+			}
 		case <-EndSignal():
 			break loop
 		}
@@ -260,7 +265,7 @@ func newHandlerConsumer(brokers []string, topic, csg string) *cluster.Consumer {
 		if err == nil {
 			return csm
 		}
-		common.Log(err, "will retry...")
+		log.Println(err, "will retry...")
 		time.Sleep(3 * time.Second)
 	}
 }
