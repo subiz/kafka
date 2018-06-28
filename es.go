@@ -1,17 +1,18 @@
 package kafka
 
 import (
-	commonpb "bitbucket.org/subiz/header/common"
 	"fmt"
 	"log"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"github.com/golang/protobuf/proto"
 	"os"
 	"os/signal"
 	"regexp"
 	"strings"
 	"time"
+
+	commonpb "bitbucket.org/subiz/header/common"
+	"github.com/Shopify/sarama"
+	cluster "github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
 )
 
 var partitioner = sarama.NewHashPartitioner("")
@@ -75,7 +76,7 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string, fr
 	me.stopchan = make(chan bool)
 	me.producer = newProducer(brokers)
 	me.asyncProducer = newAsyncProducer(brokers)
-	go me.listenAsyncProducerErrors()
+	me.listenAsyncProducerEvents()
 }
 
 func validateTopicName(topic string) bool {
@@ -282,9 +283,18 @@ func HashKeyToPar(N int, key string) int32 {
 	return par
 }
 
-func (me *EventStore) listenAsyncProducerErrors() {
-	for err := range me.asyncProducer.Errors() {
-		log.Printf("async publish message error: %s\n", err)
-		log.Println(err)
-	}
+func (me *EventStore) listenAsyncProducerEvents() {
+	go func() {
+		var successes uint
+		for range me.asyncProducer.Successes() {
+			successes++
+		}
+	}()
+
+	go func() {
+		for err := range me.asyncProducer.Errors() {
+			log.Printf("async publish message error: %s", err)
+			log.Println(err)
+		}
+	}()
 }
