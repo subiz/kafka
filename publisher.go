@@ -79,7 +79,7 @@ func NewPublisher(brokers []string) *Publisher {
 		asyncproducer:       newAsyncPublisher(brokers),
 		hashedasyncproducer: newHashedAsyncPublisher(brokers),
 	}
-	p.listenAsyncProducerErrors()
+	go p.listenAsyncProducerErrors()
 	return p
 }
 
@@ -129,19 +129,19 @@ func (p *Publisher) PublishAsync(topic string, data interface{}, par int32, key 
 }
 
 func (p *Publisher) listenAsyncProducerErrors() {
-	go func() {
-		for err := range p.asyncproducer.Errors() {
+	for {
+		select {
+		case <-p.asyncproducer.Successes():
+		case <-p.hashedasyncproducer.Successes():
+		case err := <-p.asyncproducer.Errors() :
 			log.Printf("async publish message error: %s\n", err)
 			log.Println(err)
-		}
-	}()
 
-	go func() {
-		for err := range p.hashedasyncproducer.Errors() {
+		case err := <-p.asyncproducer.Errors() :
 			log.Printf("async publish message error: %s\n", err)
 			log.Println(err)
 		}
-	}()
+	}
 }
 
 func (p *Publisher) Publish(topic string, data interface{}, par int32, key string) {

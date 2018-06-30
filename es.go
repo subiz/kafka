@@ -76,7 +76,7 @@ func (me *EventStore) Connect(brokers, topics []string, consumergroup string, fr
 	me.stopchan = make(chan bool)
 	me.producer = newProducer(brokers)
 	me.asyncProducer = newAsyncProducer(brokers)
-	me.listenAsyncProducerEvents()
+	go me.listenAsyncProducerEvents()
 }
 
 func validateTopicName(topic string) bool {
@@ -284,17 +284,14 @@ func HashKeyToPar(N int, key string) int32 {
 }
 
 func (me *EventStore) listenAsyncProducerEvents() {
-	go func() {
-		var successes uint
-		for range me.asyncProducer.Successes() {
+	var successes uint
+	for {
+		select {
+		case <-  me.asyncProducer.Successes():
 			successes++
-		}
-	}()
-
-	go func() {
-		for err := range me.asyncProducer.Errors() {
+		case err := <-me.asyncProducer.Errors():
 			log.Printf("async publish message error: %s", err)
 			log.Println(err)
 		}
-	}()
+	}
 }
