@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"strings"
 )
 
 type R map[fmt.Stringer]interface{}
@@ -195,7 +196,13 @@ func (h *Handler) commitloop(term uint64, par int32, ofsc <-chan int64) {
 				return
 			}
 			if sq := h.sqmap[par]; sq != nil {
-				fmt.Println("Handle status ", h.term, par, sq.GetStatus())
+				ss := strings.Split(sq.GetStatus(), " .. ")
+				if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
+					a, b, c := ss[0][1:], ss[1], ss[2][:len(ss[2])-1]
+					if a != b || b != c {
+						fmt.Println("Handle status ", h.term, par, sq.GetStatus())
+					}
+				}
 			}
 			h.RUnlock()
 			if changed {
