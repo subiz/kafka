@@ -1,5 +1,5 @@
 name: kafka
-version: 7
+version: 8
 run:
   .: |
     up inc

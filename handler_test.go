@@ -1,9 +1,9 @@
 package kafka
 
 import (
-	"bitbucket.org/subiz/goutils/grpc"
-	"bitbucket.org/subiz/header/account"
-	cpb "bitbucket.org/subiz/header/common"
+	"git.subiz.net/goutils/grpc"
+	"git.subiz.net/header/account"
+	cpb "git.subiz.net/header/common"
 	"context"
 	"fmt"
 	"github.com/Shopify/sarama"

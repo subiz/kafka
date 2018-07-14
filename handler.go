@@ -1,10 +1,10 @@
 package kafka
 
 import (
-	"bitbucket.org/subiz/executor"
-	"bitbucket.org/subiz/goutils/grpc"
-	cpb "bitbucket.org/subiz/header/common"
-	"bitbucket.org/subiz/squasher"
+	"git.subiz.net/executor"
+	"git.subiz.net/goutils/grpc"
+	cpb "git.subiz.net/header/common"
+	"git.subiz.net/squasher"
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"

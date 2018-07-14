@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	commonpb "bitbucket.org/subiz/header/common"
+	commonpb "git.subiz.net/header/common"
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"

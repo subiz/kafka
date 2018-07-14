@@ -27,23 +27,23 @@
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/executor"
+  name = "git.subiz.net/executor"
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/goutils"
+  name = "git.subiz.net/goutils"
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/header"
+  name = "git.subiz.net/header"
 
 [[constraint]]
   branch = "master"
-  name = "bitbucket.org/subiz/squasher"
+  name = "git.subiz.net/squasher"
 
 [[constraint]]
   name = "github.com/Shopify/sarama"
-  version = "1.16.0"
+  version = "1.17.0"
 
 [[constraint]]
   name = "github.com/bsm/sarama-cluster"

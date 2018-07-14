@@ -3,19 +3,19 @@
 
 [[projects]]
   branch = "master"
-  name = "bitbucket.org/subiz/executor"
+  name = "git.subiz.net/executor"
   packages = ["."]
-  revision = "15fd52c0359875dac63d87766215f06477f15b9f"
+  revision = "7d95a0faa3f81997549680a0d730e517347ca0ce"
 
 [[projects]]
   branch = "master"
-  name = "bitbucket.org/subiz/goutils"
+  name = "git.subiz.net/goutils"
   packages = ["grpc"]
-  revision = "8b66978cecee44f7878d05f89e1b3152305a7b0c"
+  revision = "9daac1c8c490781aa50db359dca8b510d0086689"
 
 [[projects]]
   branch = "master"
-  name = "bitbucket.org/subiz/header"
+  name = "git.subiz.net/header"
   packages = [
     "account",
     "auth",
@@ -23,13 +23,13 @@
     "lang",
     "payment"
   ]
-  revision = "175adcb6f0b2f84acc826334f874df7d58179fdd"
+  revision = "f5d7f5c7a587e79a04c4ba87a2eb5b3ebc331af4"
 
 [[projects]]
   branch = "master"
-  name = "bitbucket.org/subiz/squasher"
+  name = "git.subiz.net/squasher"
   packages = ["."]
-  revision = "a3e897ea2851fb25932bd4b5bbde5c308af83ce1"
+  revision = "245e8d05235e8113b3e3c5754191bcccca12f7cb"
 
 [[projects]]
   name = "github.com/Shopify/sarama"
@@ -59,7 +59,7 @@
   branch = "master"
   name = "github.com/eapache/go-xerial-snappy"
   packages = ["."]
-  revision = "bb955e01b9346ac19dc29eb16586c90ded99a98c"
+  revision = "040cc1a32f578808623071247fdbd5cc43f37f5f"
 
 [[projects]]
   name = "github.com/eapache/queue"
@@ -77,7 +77,7 @@
     "ptypes/duration",
     "ptypes/timestamp"
   ]
-  revision = "9eb2c01ac278a5d89ce4b2be68fe4500955d8179"
+  revision = "70b3af33377e7aa25ae42977bed93cc6b90f0373"
 
 [[projects]]
   branch = "master"
@@ -122,7 +122,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "e514e69ffb8bc3c76a71ae40de0118d794855992"
+  revision = "d0887baf81f4598189d4e12a37c6da86f0bba4d0"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -149,7 +149,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
+  revision = "e92b116572682a5b432ddd840aeaba2a559eeff1"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -186,6 +186,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "363a8366ed4aa7a417e0123b1786955b838ec3c8b57310ffaf6180789861d9e0"
+  inputs-digest = "5b9092a4f92bc400d7a655fb780f7ba0cf6399585df0594dfea30f22a77e31da"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -3,7 +3,6 @@
 package kafka
 
 import (
-	common "bitbucket.org/subiz/gocommon"
 	"encoding/binary"
 	"runtime"
 	"testing"
