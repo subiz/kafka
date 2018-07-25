@@ -1,10 +1,11 @@
 package kafka
 
 import (
-	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
 	"log"
 	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/golang/protobuf/proto"
 )
 
 type Publisher struct {
@@ -133,11 +134,11 @@ func (p *Publisher) listenAsyncProducerErrors() {
 		select {
 		case <-p.asyncproducer.Successes():
 		case <-p.hashedasyncproducer.Successes():
-		case err := <-p.asyncproducer.Errors() :
+		case err := <-p.asyncproducer.Errors():
 			log.Printf("async publish message error: %s\n", err)
 			log.Println(err)
 
-		case err := <-p.asyncproducer.Errors() :
+		case err := <-p.hashedasyncproducer.Errors():
 			log.Printf("async publish message error: %s\n", err)
 			log.Println(err)
 		}
