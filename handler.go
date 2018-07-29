@@ -74,7 +74,7 @@ func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, auto
 		consumer:    csm,
 		squashercap: maxworkers * maxlag * 2,
 	}
-	h.exec = executor.NewExecutor(maxworkers, maxlag, h.handleJob)
+	h.exec = executor.New(maxworkers, maxlag, h.handleJob)
 	return h
 }
 
@@ -152,8 +152,8 @@ func (h *Handler) Commit(term uint64, partition int32, offset int64) error {
 	return nil
 }
 
-func (h *Handler) handleJob(job executor.Job) {
-	mes := job.Data.(Job)
+func (h *Handler) handleJob(_ string, job interface{}) {
+	mes := job.(Job)
 	h.Lock()
 	if h.term != mes.Term {
 		h.Unlock()
@@ -233,8 +233,7 @@ loop:
 			if !more || msg == nil {
 				break loop
 			}
-			j := executor.Job{Key: string(msg.Key), Data: Job{msg, h.term}}
-			h.exec.AddJob(j)
+			h.exec.Add(string(msg.Key), Job{msg, h.term})
 		case ntf := <-h.consumer.Notifications():
 			if ntf == nil {
 				break loop
