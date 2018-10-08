@@ -162,6 +162,9 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 		}
 		log.Println(err)
 		log.Printf("unable to publist message, topic: %s, partition %d, key %s, data: %v\n", topic, par, key, data)
+		if err.Error() == sarama.ErrInvalidPartition.Error() {
+			break
+		}
 		log.Println("retrying after 5sec")
 		time.Sleep(5 * time.Second)
 	}
