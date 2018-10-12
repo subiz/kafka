@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -160,11 +161,18 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 		if err == nil {
 			break
 		}
-		log.Println(err)
-		log.Printf("unable to publist message, topic: %s, partition %d, key %s, data: %v\n", topic, par, key, data)
-		if err.Error() == sarama.ErrInvalidPartition.Error() {
+
+		d := fmt.Sprintf("%v", data)
+		if len(d) > 5000 {
+			d = d[len(d)-4000:]
+		}
+		log.Println("unable to publish message, topic: %s, partition %d, key %s, data: %s %v\n", topic, par, key, d, err)
+
+		if err.Error() == sarama.ErrInvalidPartition.Error() ||
+			err.Error() == sarama.ErrMessageSizeTooLarge.Error() {
 			break
 		}
+
 		log.Println("retrying after 5sec")
 		time.Sleep(5 * time.Second)
 	}
