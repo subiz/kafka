@@ -173,7 +173,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 	if len(cbs) > 0 {
 		nh = cbs[0].(func(map[string][]int32))
 	}
-
+	sigchan := EndSignal()
 	for {
 		select {
 		case msg, more := <-me.consumer.Messages():
@@ -207,7 +207,7 @@ func (me EventStore) Listen(h func(partition int32, topic string, value []byte, 
 			if err != nil {
 				log.Println("kafka err", err)
 			}
-		case <-EndSignal():
+		case <-sigchan:
 			goto end
 		}
 	}
@@ -287,7 +287,7 @@ func (me *EventStore) listenAsyncProducerEvents() {
 	var successes uint
 	for {
 		select {
-		case <-  me.asyncProducer.Successes():
+		case <-me.asyncProducer.Successes():
 			successes++
 		case err := <-me.asyncProducer.Errors():
 			log.Printf("async publish message error: %s", err)
