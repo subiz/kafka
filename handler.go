@@ -1,19 +1,19 @@
 package kafka
 
 import (
+	"fmt"
 	"git.subiz.net/executor"
 	"git.subiz.net/goutils/grpc"
 	cpb "git.subiz.net/header/common"
 	"git.subiz.net/squasher"
-	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 type R map[fmt.Stringer]interface{}
@@ -226,6 +226,7 @@ func (h *Handler) createSqIfNotExist(par int32, offset int64) *squasher.Squasher
 
 func (h *Handler) Serve(handler R, nh func([]int32)) error {
 	h.hs = convertToHandleFunc(handler)
+	endsignal := EndSignal()
 loop:
 	for {
 		select {
@@ -250,7 +251,7 @@ loop:
 			if err != nil {
 				log.Println("kafka error", err)
 			}
-		case <-EndSignal():
+		case <-endsignal:
 			break loop
 		}
 	}
