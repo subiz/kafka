@@ -43,15 +43,15 @@
 
 [[constraint]]
   name = "github.com/Shopify/sarama"
-  version = "1.17.0"
+  version = "1.19.0"
 
 [[constraint]]
   name = "github.com/bsm/sarama-cluster"
-  version = "2.1.13"
+  version = "2.1.15"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/golang/protobuf"
+  version = "1.2.0"
 
 [prune]
   go-tests = true
