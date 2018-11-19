@@ -27,6 +27,10 @@
 
 [[constraint]]
   branch = "master"
+  name = "git.subiz.net/errors"
+
+[[constraint]]
+  branch = "master"
   name = "git.subiz.net/executor"
 
 [[constraint]]
