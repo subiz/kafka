@@ -1,14 +1,14 @@
 package kafka
 
 import (
-	"git.subiz.net/goutils/grpc"
-	"git.subiz.net/header/account"
-	cpb "git.subiz.net/header/common"
 	"context"
 	"fmt"
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
+	"github.com/subiz/goutils/grpc"
+	"github.com/subiz/header/account"
+	cpb "github.com/subiz/header/common"
 	"hash/crc32"
 	"testing"
 	"time"

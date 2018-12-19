@@ -1,10 +1,12 @@
 package kafka
 
 import (
-	"git.subiz.net/errors"
-	"git.subiz.net/executor"
 	"github.com/Shopify/sarama"
+	"github.com/subiz/errors"
+	"github.com/subiz/executor"
 	"log"
+	"os"
+	"os/signal"
 	"time"
 )
 
@@ -84,4 +86,10 @@ func (cs *Consumers) Serve(handler R, nh func([]int32)) error {
 		}()
 	}
 	return <-errchan
+}
+
+func EndSignal() chan os.Signal {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	return signals
 }

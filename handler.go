@@ -2,13 +2,13 @@ package kafka
 
 import (
 	"fmt"
-	"git.subiz.net/executor"
-	"git.subiz.net/goutils/grpc"
-	cpb "git.subiz.net/header/common"
-	"git.subiz.net/squasher"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
+	"github.com/subiz/executor"
+	"github.com/subiz/goutils/grpc"
+	cpb "github.com/subiz/header/common"
+	"github.com/subiz/squasher"
 	"log"
 	"reflect"
 	"strings"

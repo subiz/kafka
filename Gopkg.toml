@@ -26,28 +26,8 @@
 
 
 [[constraint]]
-  branch = "master"
-  name = "git.subiz.net/errors"
-
-[[constraint]]
-  branch = "master"
-  name = "git.subiz.net/executor"
-
-[[constraint]]
-  branch = "master"
-  name = "git.subiz.net/goutils"
-
-[[constraint]]
-  branch = "master"
-  name = "git.subiz.net/header"
-
-[[constraint]]
-  branch = "master"
-  name = "git.subiz.net/squasher"
-
-[[constraint]]
   name = "github.com/Shopify/sarama"
-  version = "1.19.0"
+  version = "1.20.0"
 
 [[constraint]]
   name = "github.com/bsm/sarama-cluster"
@@ -56,6 +36,26 @@
 [[constraint]]
   name = "github.com/golang/protobuf"
   version = "1.2.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/subiz/errors"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/subiz/executor"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/subiz/goutils"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/subiz/header"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/subiz/squasher"
 
 [prune]
   go-tests = true

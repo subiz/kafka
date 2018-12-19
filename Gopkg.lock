@@ -3,57 +3,31 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:602db34ab2d20edeb1871a2a3839ac97c4b83eb6d0d8e211969ce5e0641dfc2a"
-  name = "git.subiz.net/errors"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2d810a04706271e0ad9d4381ecddc1e1d2e5025f"
-
-[[projects]]
-  branch = "master"
-  digest = "1:ed5c7387bf6b22219d8ee6878245814deab2c5086be5e37d64f57fc561d56f96"
-  name = "git.subiz.net/executor"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "05e8cfa460367c0fc30ef6788695b1e2951a8e84"
-
-[[projects]]
-  branch = "master"
-  digest = "1:99ae331c4e68c0f844eaecc4148ded9ac84cd4f8f10581b1c3c7c657ca5407f8"
-  name = "git.subiz.net/goutils"
-  packages = ["grpc"]
-  pruneopts = "UT"
-  revision = "55cbdec4906a8b64d5e67ed8a96a3347d5a040f9"
-
-[[projects]]
-  branch = "master"
-  digest = "1:c3a8e3f570472fe422cf1be403744caa7567594a443ad87d68d1dac1b1ad1606"
+  digest = "1:06ef7875708c97318e403910db3feb251b83eb6368c967ce4c87f9cc848a8f63"
   name = "git.subiz.net/header"
   packages = [
-    "account",
     "auth",
     "common",
-    "lang",
     "payment",
   ]
   pruneopts = "UT"
-  revision = "c9c36d61f1b1a6af8a4b376fde638a22714d7934"
+  revision = "25d854f0a2373a3c7e822d0f24414ddbeb90f0cb"
 
 [[projects]]
-  branch = "master"
-  digest = "1:d40f1445a44af8bcc18f2c494edb3dd68935941a6392a0aa1218bd08b9630116"
-  name = "git.subiz.net/squasher"
+  digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
+  name = "github.com/DataDog/zstd"
   packages = ["."]
   pruneopts = "UT"
-  revision = "cd2369591cd398dab1f23ee9f2c05de00c88b36f"
+  revision = "aebefd9fcb99f22cd691ef778a12ed68f0e6a1ab"
+  version = "v1.3.4"
 
 [[projects]]
-  digest = "1:6981402aef27693f4b2ec619117abd263fde29f8c1dfac46eef0f35038d37513"
+  digest = "1:a59a467c541a1bf8b06e4fad6113028c959be6573b78ceca9f8020cd0d2127fc"
   name = "github.com/Shopify/sarama"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ec843464b50d4c8b56403ec9d589cf41ea30e722"
-  version = "v1.19.0"
+  revision = "879f631812a30a580659e8035e7cda9994bb99ac"
+  version = "v1.20.0"
 
 [[projects]]
   digest = "1:526d64d0a3ac6c24875724a9355895be56a21f89a5d3ab5ba88d91244269a7d8"
@@ -118,6 +92,20 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  branch = "master"
+  digest = "1:e6d91bf5631caea3c36d6cb3fa058e13d8df0b9d2787efbb9d78bbcf4dbe5fd7"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    ".",
+    "buffer",
+    "gen",
+    "jlexer",
+    "jwriter",
+  ]
+  pruneopts = "UT"
+  revision = "60711f1a8329503b04e1c88535f419d0bb440bff"
+
+[[projects]]
   digest = "1:e39a5ee8fcbec487f8fc68863ef95f2b025e0739b0e4aa55558a2b4cf8f0ecf0"
   name = "github.com/pierrec/lz4"
   packages = [
@@ -138,7 +126,50 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:6ca51c5d8a610b3da56856df7a8f8f3e075eba8d5f7a4acbadd79b2d2a368054"
+  digest = "1:79a1c0b48d241cb4509932e647ad50f97a4f4a603e54fc9f13acb5f293b2eaa7"
+  name = "github.com/subiz/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9317be24324757d8c0ee9104ca51c055b9eaea36"
+
+[[projects]]
+  branch = "master"
+  digest = "1:ed5c7387bf6b22219d8ee6878245814deab2c5086be5e37d64f57fc561d56f96"
+  name = "github.com/subiz/executor"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "05e8cfa460367c0fc30ef6788695b1e2951a8e84"
+
+[[projects]]
+  branch = "master"
+  digest = "1:b48667b7e16fbdbc0cff6de098c30c6b60fa5dbfd1d2938bb7a38a042d50815f"
+  name = "github.com/subiz/goutils"
+  packages = ["grpc"]
+  pruneopts = "UT"
+  revision = "2695431d0ed2c6ef88d78ef26d84277874d3df10"
+
+[[projects]]
+  branch = "master"
+  digest = "1:85eed3d4bc1ef42303c2ac36a2059a7cb549ea76ea11f3cb6c9701e3423950c5"
+  name = "github.com/subiz/header"
+  packages = [
+    "account",
+    "common",
+  ]
+  pruneopts = "UT"
+  revision = "25d854f0a2373a3c7e822d0f24414ddbeb90f0cb"
+
+[[projects]]
+  branch = "master"
+  digest = "1:d40f1445a44af8bcc18f2c494edb3dd68935941a6392a0aa1218bd08b9630116"
+  name = "github.com/subiz/squasher"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cd2369591cd398dab1f23ee9f2c05de00c88b36f"
+
+[[projects]]
+  branch = "master"
+  digest = "1:89a0cb976397aa9157a45bb2b896d0bcd07ee095ac975e0f03c53250c402265e"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -150,15 +181,15 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "adae6a3d119ae4890b46832a2e88a95adc62b8e7"
+  revision = "e147a9138326bc0e9d4e179541ffd8af41cff8a9"
 
 [[projects]]
   branch = "master"
-  digest = "1:a62e80faf19c93dcbd7954a26fdb51acbfcb4b7161966adf1de531e593c4834a"
+  digest = "1:48a949ee15f5f03524b792547822221b07f828dd26522b5e08688f25a10d14c1"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "93218def8b18e66adbdab3eca8ec334700329f1f"
+  revision = "074acd46bca67915925527c07849494d115e7c43"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -185,31 +216,36 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:56b0bca90b7e5d1facf5fbdacba23e4e0ce069d25381b8e2f70ef1e7ebfb9c1a"
+  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "b5d43981345bdb2c233eb4bf3277847b48c6fdc6"
+  revision = "67d6565462c5a0d99b88193d59fefa10ca7e3010"
 
 [[projects]]
-  digest = "1:c3ad9841823db6da420a5625b367913b4ff54bbe60e8e3c98bd20e243e62e2d2"
+  digest = "1:9edd250a3c46675d0679d87540b30c9ed253b19bd1fd1af08f4f5fb3c79fc487"
   name = "google.golang.org/grpc"
   packages = [
     ".",
     "balancer",
     "balancer/base",
     "balancer/roundrobin",
+    "binarylog/grpc_binarylog_v1",
     "codes",
     "connectivity",
     "credentials",
+    "credentials/internal",
     "encoding",
     "encoding/proto",
     "grpclog",
     "internal",
     "internal/backoff",
+    "internal/binarylog",
     "internal/channelz",
     "internal/envconfig",
     "internal/grpcrand",
+    "internal/grpcsync",
+    "internal/syscall",
     "internal/transport",
     "keepalive",
     "metadata",
@@ -223,22 +259,22 @@
     "tap",
   ]
   pruneopts = "UT"
-  revision = "2e463a05d100327ca47ac218281906921038fd95"
-  version = "v1.16.0"
+  revision = "df014850f6dee74ba2fc94874043a9f3f75fbfd8"
+  version = "v1.17.0"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "git.subiz.net/errors",
-    "git.subiz.net/executor",
-    "git.subiz.net/goutils/grpc",
-    "git.subiz.net/header/account",
-    "git.subiz.net/header/common",
-    "git.subiz.net/squasher",
     "github.com/Shopify/sarama",
     "github.com/bsm/sarama-cluster",
     "github.com/golang/protobuf/proto",
+    "github.com/subiz/errors",
+    "github.com/subiz/executor",
+    "github.com/subiz/goutils/grpc",
+    "github.com/subiz/header/account",
+    "github.com/subiz/header/common",
+    "github.com/subiz/squasher",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

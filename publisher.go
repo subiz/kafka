@@ -26,7 +26,7 @@ func newHashedSyncPublisher(brokers []string) sarama.SyncProducer {
 		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
 		time.Sleep(5 * time.Second)
 		producer, err = sarama.NewSyncProducer(brokers, config)
-	}
+}
 	return producer
 }
 
