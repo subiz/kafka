@@ -2,18 +2,6 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:06ef7875708c97318e403910db3feb251b83eb6368c967ce4c87f9cc848a8f63"
-  name = "git.subiz.net/header"
-  packages = [
-    "auth",
-    "common",
-    "payment",
-  ]
-  pruneopts = "UT"
-  revision = "25d854f0a2373a3c7e822d0f24414ddbeb90f0cb"
-
-[[projects]]
   digest = "1:c99bd4548f502371b98c77534239a514c9a1e715d468af3c108db06186aa692a"
   name = "github.com/DataDog/zstd"
   packages = ["."]
@@ -93,12 +81,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e6d91bf5631caea3c36d6cb3fa058e13d8df0b9d2787efbb9d78bbcf4dbe5fd7"
+  digest = "1:aa3d8d42865c42626b5c1add193692d045b3188b1479f0a0a88690d21fe20083"
   name = "github.com/mailru/easyjson"
   packages = [
     ".",
     "buffer",
-    "gen",
     "jlexer",
     "jwriter",
   ]
@@ -126,11 +113,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:79a1c0b48d241cb4509932e647ad50f97a4f4a603e54fc9f13acb5f293b2eaa7"
+  digest = "1:9bcd33310ae56ff2eefd9cda86e4db75f54f1c5e9469b836529f1dc04c282cbc"
   name = "github.com/subiz/errors"
   packages = ["."]
   pruneopts = "UT"
-  revision = "9317be24324757d8c0ee9104ca51c055b9eaea36"
+  revision = "c89ddc5fe829b83a2a150c02ccd6e6dbd681ef8c"
 
 [[projects]]
   branch = "master"
@@ -142,22 +129,24 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b48667b7e16fbdbc0cff6de098c30c6b60fa5dbfd1d2938bb7a38a042d50815f"
+  digest = "1:7c288743640e897ee6e5ead81c4f533d32779a642dfbd4f08d3b0fd6c274da79"
   name = "github.com/subiz/goutils"
   packages = ["grpc"]
   pruneopts = "UT"
-  revision = "2695431d0ed2c6ef88d78ef26d84277874d3df10"
+  revision = "7a6f083d4d3af6175c673d50e71adbdfb3858235"
 
 [[projects]]
   branch = "master"
-  digest = "1:85eed3d4bc1ef42303c2ac36a2059a7cb549ea76ea11f3cb6c9701e3423950c5"
+  digest = "1:3cf13e2c03139a77cee50a525d66439950dce0553e6f1dbd12e6a605568e62bd"
   name = "github.com/subiz/header"
   packages = [
     "account",
+    "auth",
     "common",
+    "payment",
   ]
   pruneopts = "UT"
-  revision = "25d854f0a2373a3c7e822d0f24414ddbeb90f0cb"
+  revision = "fe31ca7c565e496899835b4a4d66865650003897"
 
 [[projects]]
   branch = "master"
@@ -220,7 +209,7 @@
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "67d6565462c5a0d99b88193d59fefa10ca7e3010"
+  revision = "5a97ab628bfb2f65f6befec18f4bc7bc7f382b77"
 
 [[projects]]
   digest = "1:9edd250a3c46675d0679d87540b30c9ed253b19bd1fd1af08f4f5fb3c79fc487"
