@@ -115,8 +115,8 @@ func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.P
 		Key:       sarama.StringEncoder(key),
 		Value:     sarama.ByteEncoder(value),
 	}
-
 }
+
 func (p *Publisher) PublishAsync(topic string, data interface{}, par int32, key string) {
 	msg := prepareMsg(topic, data, par, key)
 	if msg == nil {
