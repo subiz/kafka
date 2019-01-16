@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
+	"github.com/golang/protobuf/proto"
 	"github.com/subiz/squasher"
 	"log"
-	"os"
-	"os/signal"
 	"strings"
 	"time"
 )
@@ -17,9 +16,19 @@ const REDUCE = "reduce"
 const BEGIN = "begin"
 const GLOBALMAP = "global_map"
 
+type KafkaMessage struct {
+	key       string
+	partition int32
+	offset    int64
+	data      interface{}
+}
+
 type Package struct {
 	key  string
 	data interface{}
+
+	donec        chan KafkaMessage
+	baseMessages []KafkaMessage
 }
 
 type Phase struct {
@@ -29,6 +38,7 @@ type Phase struct {
 }
 
 type MapReducer struct {
+	csm     *cluster.Consumer
 	handler *Handler
 	phases  []Phase
 }
@@ -44,54 +54,88 @@ type Mapper interface {
 
 func NewMapReducer(csg, topic string) *MapReducer {
 	me := &MapReducer{}
-	//	me.handler = NewHandler(brokers, csg, topic, 1000, 100, false)
 	return me
 }
 
-func publish(producer sarama.SyncProducer, topic string, data interface{}, key string) {
-	msg := prepareMsg(topic, data, -1, key)
-	if msg == nil {
-		log.Println("no publish")
-		return
-	}
-
-	for {
-		_, _, err := producer.SendMessage(msg)
-		if err != nil {
-			break
-		}
-
-		d := fmt.Sprintf("%v", data)
-		if len(d) > 5000 {
-			d = d[len(d)-4000:]
-		}
-		log.Printf("ERR SDFLF35LL unable to publish message, topic: %s, key %s, data: %s %v\n", topic, key, d, err)
-
-		if err.Error() == sarama.ErrInvalidPartition.Error() ||
-			err.Error() == sarama.ErrMessageSizeTooLarge.Error() {
-			break
-		}
-
-		log.Println("retrying after 5sec")
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func (me *MapReducer) GlobalMap(brokers []string, topic, csm string, f func(interface{}) string) Mapper {
+func (me *MapReducer) GlobalMap(brokers []string, topic, group string, f func(interface{}) string) Mapper {
 	// take the last in
 	// TODO: check err
 	lastphase := me.phases[len(me.phases)-1]
-	outc := make(chan<- Package)
 
-	publisher := newHashedSyncPublisher(brokers)
+	publisher := newHashedAsyncPublisher(brokers)
+	inchan := publisher.Input()
+
+	outc := make(chan Package)
+
+	go func() {
+		for msg := range publisher.Successes() {
+			pkg := msg.Metadata.(Package)
+			for _, msg := range pkg.baseMessages {
+				pkg.donec <- msg
+			}
+		}
+	}()
+
+	go func() {
+		for err := range publisher.Errors() {
+			fmt.Println(err)
+		}
+	}()
+
 	for pkg := range lastphase.inchan {
 		key := f(pkg.data)
-		publish(publisher, topic, pkg.data, key)
+		if msg := packMsg(topic, pkg, key); msg != nil {
+			inchan <- msg
+		}
 	}
+
+	go func() {
+		donec := make(chan KafkaMessage)
+		c := receive(brokers, topic, group, donec)
+		for msg := range c {
+			outc <- Package{
+				key:   string(msg.key),
+				data:  msg.data,
+				donec: donec,
+				baseMessages: []KafkaMessage{{
+					partition: msg.partition,
+					offset:    msg.offset,
+				}},
+			}
+		}
+	}()
 	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
 
-	go me.receive(brokers, topic, csm, outc)
 	return me
+}
+
+func packMsg(topic string, pkg Package, key string) *sarama.ProducerMessage {
+	var value []byte
+	var err error
+	data := pkg.data
+	switch data := data.(type) {
+	case proto.Message:
+		value, err = proto.Marshal(data)
+		if err != nil {
+			log.Printf("kafka error, unable to marshal: %v\n", data)
+			return nil
+		}
+	case []byte:
+		value = data
+	case string:
+		value = []byte(data)
+	default:
+		log.Println("value should be type of proto.Message, []byte or string")
+		return nil
+	}
+
+	return &sarama.ProducerMessage{
+		Topic:     topic,
+		Partition: -1,
+		Key:       sarama.StringEncoder(key),
+		Value:     sarama.ByteEncoder(value),
+		Metadata:  pkg,
+	}
 }
 
 /*
@@ -119,8 +163,8 @@ func (me *MapReducer) Map(f func(interface{}) string) Mapper {
 	outc := make(chan Package)
 
 	for pkg := range lastphase.inchan {
-		key := f(pkg.data)
-		outc <- Package{key: key, data: pkg.data}
+		pkg.key = f(pkg.data)
+		outc <- pkg
 	}
 	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
 	return me
@@ -142,9 +186,16 @@ func (me *MapReducer) Reduce(f func(string, []Package) interface{}) Reducer {
 	m := make(map[string][]Package)
 	bulkcount := 0
 	clear := func() {
+
 		for key, pkgs := range m {
+			basemsgs := make([]KafkaMessage, 0)
+			var donec chan KafkaMessage
+			for _, pkg := range pkgs {
+				donec = pkg.donec
+				basemsgs = append(basemsgs, pkg.baseMessages...)
+			}
 			data := f(key, pkgs)
-			outc <- Package{key: key, data: data}
+			outc <- Package{key: key, data: data, donec: donec, baseMessages: basemsgs}
 			delete(m, key)
 		}
 		bulkcount = 0
@@ -229,12 +280,12 @@ func connectKafka(brokers []string, topic, csg string) (*cluster.Client, *cluste
 // which a consumer of group csg will start streamming from.
 // This function takes a connected kafka client, topic, consumer group ID and list
 // of partitions and returns a map of partition number and initial offset
-func fetchInitialOffsets(client *cluster.Client, topic, csg string, pars []int32) (map[int32]int64, error) {
-	broker, err := client.Coordinator(csg)
+func fetchInitialOffsets(client *cluster.Client, topic, group string, pars []int32) (map[int32]int64, error) {
+	broker, err := client.Coordinator(group)
 	if err != nil {
 		return nil, err
 	}
-	req := &sarama.OffsetFetchRequest{ConsumerGroup: csg}
+	req := &sarama.OffsetFetchRequest{ConsumerGroup: group}
 	for _, par := range pars {
 		req.AddPartition(topic, par)
 	}
@@ -255,50 +306,55 @@ func fetchInitialOffsets(client *cluster.Client, topic, csg string, pars []int32
 	return out, nil
 }
 
-func (me *MapReducer) receive(brokers []string, topic, csg string, outc chan<- Package) {
-	client, consumer := connectKafka(brokers, topic, csg)
-	endsignal := make(chan os.Signal, 1)
-	signal.Notify(endsignal, os.Interrupt)
-
+func receive(brokers []string, topic, group string, donec <-chan KafkaMessage) <-chan KafkaMessage {
+	client, consumer := connectKafka(brokers, topic, group)
+	outc := make(chan KafkaMessage)
 	sqmap := make(map[int32]*squasher.Squasher)
-loop:
-	for {
-		select {
-		case msg := <-consumer.Messages():
-			if msg != nil {
-				outc <- Package{key: string(msg.Key), data: msg.Value}
+	go func() {
+		defer consumer.Close()
+		for {
+			select {
+			case msg, more := <-donec:
+				if more {
+					if sq, ok := sqmap[msg.partition]; ok {
+						sq.Mark(msg.offset)
+					}
+				}
+			case msg := <-consumer.Messages():
+				if msg != nil {
+					outc <- KafkaMessage{
+						key:       string(msg.Key),
+						offset:    msg.Offset,
+						partition: msg.Partition,
+						data:      msg.Value,
+					}
+				}
+			case ntf := <-consumer.Notifications():
+				if ntf == nil {
+					return
+				}
+				pars := ntf.Current[topic]
+				offsetM, err := fetchInitialOffsets(client, topic, group, pars)
+				if err != nil {
+					log.Println("ERRFASDRT544", err)
+					return
+				}
+				for k := range sqmap {
+					delete(sqmap, k)
+				}
+				for _, par := range pars {
+					sq := squasher.NewSquasher(offsetM[par], 10000) // 1M
+					sqmap[par] = sq
+					commitloop(consumer, topic, par, sq)
+				}
+			case err := <-consumer.Errors():
+				if err != nil {
+					log.Println("ERRDLOIDRFMS532 kafka error", err)
+				}
 			}
-			// exec.Add(string(msg.Key), Job{msg, me.term})
-		case ntf := <-consumer.Notifications():
-			if ntf == nil {
-				break loop
-			}
-
-			pars := ntf.Current[topic]
-			offsetM, err := fetchInitialOffsets(client, topic, csg, pars)
-			if err != nil {
-				log.Println("ERRFASDRT544", err)
-				break loop
-			}
-			for k := range sqmap {
-				delete(sqmap, k)
-			}
-			for _, par := range pars {
-				sq := squasher.NewSquasher(offsetM[par], 10000) // 1M
-				sqmap[par] = sq
-				commitloop(consumer, topic, par, sq)
-			}
-		case err := <-consumer.Errors():
-			if err != nil {
-				log.Println("ERRDLOIDRFMS532 kafka error", err)
-			}
-		case <-endsignal:
-			break loop
 		}
-	}
-	if err := consumer.Close(); err != nil {
-		log.Println("DDJDL45DL", err)
-	}
+	}()
+	return outc
 }
 
 func (me *MapReducer) Pipe(topic string) *MapReducer {
