@@ -16,40 +16,59 @@ const REDUCE = "reduce"
 const BEGIN = "begin"
 const GLOBALMAP = "global_map"
 
+type Message interface {
+	GetKey() string
+	GetData() interface{}
+	Commit() // mark as done
+}
+
+//
+type MRMessage struct {
+	key          string
+	data         interface{}
+	baseMessages []Message
+}
+
+func (me MRMessage) GetKey() string       { return me.key }
+func (me MRMessage) GetData() interface{} { return me.data }
+func (me MRMessage) Commit() {
+	for _, base := range me.baseMessages {
+		base.Commit()
+	}
+}
+
 type KafkaMessage struct {
 	key       string
 	partition int32
 	offset    int64
 	data      interface{}
+	donec     chan<- KafkaMessage
 }
 
-type Package struct {
-	key  string
-	data interface{}
-
-	donec        chan KafkaMessage
-	baseMessages []KafkaMessage
-}
+func (me KafkaMessage) GetKey() string       { return me.key }
+func (me KafkaMessage) GetData() interface{} { return me.data }
+func (me KafkaMessage) Commit()              { me.donec <- me }
 
 type Phase struct {
 	funcType string
-	inchan   <-chan Package
-	outchan  chan<- Package
+	inchan   <-chan Message
+	outchan  chan<- Message
 }
 
 type MapReducer struct {
-	csm     *cluster.Consumer
-	handler *Handler
-	phases  []Phase
+	phases []Phase
 }
 
+type MapF func(interface{}) string // receive an object and return it's key
+type ReduceF func(string, interface{}, interface{}) interface{}
+
 type Reducer interface {
-	Map(f func(interface{}) string) Mapper
-	GlobalMap(brokers []string, topic, csm string, f func(interface{}) string) Mapper
+	Map(f MapF) Mapper
+	GlobalMap(brokers []string, topic, csm string, f MapF) Mapper
 }
 
 type Mapper interface {
-	Reduce(f func(string, []Package) interface{}) Reducer
+	Reduce(f ReduceF) Reducer
 }
 
 func NewMapReducer(csg, topic string) *MapReducer {
@@ -57,62 +76,47 @@ func NewMapReducer(csg, topic string) *MapReducer {
 	return me
 }
 
-func (me *MapReducer) GlobalMap(brokers []string, topic, group string, f func(interface{}) string) Mapper {
+func (me *MapReducer) GlobalMap(brokers []string, topic, group string, f MapF) Mapper {
 	// take the last in
 	// TODO: check err
 	lastphase := me.phases[len(me.phases)-1]
 
 	publisher := newHashedAsyncPublisher(brokers)
-	inchan := publisher.Input()
-
-	outc := make(chan Package)
+	inchan := publisher.Input() // used to publish to kafka
 
 	go func() {
-		for msg := range publisher.Successes() {
-			pkg := msg.Metadata.(Package)
-			for _, msg := range pkg.baseMessages {
-				pkg.donec <- msg
+		for {
+			select {
+			case msg := <-publisher.Successes():
+				msg.Metadata.(Message).Commit()
+			case err := <-publisher.Errors():
+				fmt.Println(err)
 			}
 		}
 	}()
 
-	go func() {
-		for err := range publisher.Errors() {
-			fmt.Println(err)
-		}
-	}()
-
-	for pkg := range lastphase.inchan {
-		key := f(pkg.data)
-		if msg := packMsg(topic, pkg, key); msg != nil {
-			inchan <- msg
+	for mrmsg := range lastphase.inchan {
+		key := f(mrmsg.GetData())
+		if msg := packMsg(topic, mrmsg, key); msg != nil {
+			inchan <- msg // publish to kafka
 		}
 	}
 
+	outc := make(chan Message)
 	go func() {
 		donec := make(chan KafkaMessage)
-		c := receive(brokers, topic, group, donec)
-		for msg := range c {
-			outc <- Package{
-				key:   string(msg.key),
-				data:  msg.data,
-				donec: donec,
-				baseMessages: []KafkaMessage{{
-					partition: msg.partition,
-					offset:    msg.offset,
-				}},
-			}
+		for msg := range receive(brokers, topic, group, donec) {
+			outc <- msg
 		}
 	}()
 	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
-
 	return me
 }
 
-func packMsg(topic string, pkg Package, key string) *sarama.ProducerMessage {
+func packMsg(topic string, msg Message, key string) *sarama.ProducerMessage {
 	var value []byte
 	var err error
-	data := pkg.data
+	data := msg.GetData()
 	switch data := data.(type) {
 	case proto.Message:
 		value, err = proto.Marshal(data)
@@ -134,7 +138,7 @@ func packMsg(topic string, pkg Package, key string) *sarama.ProducerMessage {
 		Partition: -1,
 		Key:       sarama.StringEncoder(key),
 		Value:     sarama.ByteEncoder(value),
-		Metadata:  pkg,
+		Metadata:  msg,
 	}
 }
 
@@ -158,13 +162,17 @@ func packMsg(topic string, pkg Package, key string) *sarama.ProducerMessage {
 
 */
 // Map registries a map function
-func (me *MapReducer) Map(f func(interface{}) string) Mapper {
+func (me *MapReducer) Map(f MapF) Mapper {
 	lastphase := me.phases[len(me.phases)-1]
-	outc := make(chan Package)
+	outc := make(chan Message)
 
-	for pkg := range lastphase.inchan {
-		pkg.key = f(pkg.data)
-		outc <- pkg
+	for msg := range lastphase.inchan {
+		key := f(msg.GetData())
+		outc <- MRMessage{
+			key:          key,
+			data:         msg.GetData(),
+			baseMessages: []Message{msg},
+		}
 	}
 	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
 	return me
@@ -175,46 +183,41 @@ func (me *MapReducer) Run() {
 }
 
 // Reduce registries a map function
-func (me *MapReducer) Reduce(f func(string, []Package) interface{}) Reducer {
-	// take the last in
-	lastphase := me.phases[len(me.phases)-1]
-	outc := make(chan Package)
+func (me *MapReducer) Reduce(f ReduceF) Reducer {
+	outc := make(chan Message)
 
-	ticker := time.NewTicker(10 * time.Second)
-	bigc := make(chan bool)
-
-	m := make(map[string][]Package)
+	reduceM := make(map[string]MRMessage) // key -> MRMessage
 	bulkcount := 0
 	clear := func() {
-
-		for key, pkgs := range m {
-			basemsgs := make([]KafkaMessage, 0)
-			var donec chan KafkaMessage
-			for _, pkg := range pkgs {
-				donec = pkg.donec
-				basemsgs = append(basemsgs, pkg.baseMessages...)
-			}
-			data := f(key, pkgs)
-			outc <- Package{key: key, data: data, donec: donec, baseMessages: basemsgs}
-			delete(m, key)
+		for key, mrmsg := range reduceM {
+			outc <- mrmsg
+			delete(reduceM, key)
 		}
 		bulkcount = 0
 	}
 
 	go func() {
+		// take the last in
+		lastphase := me.phases[len(me.phases)-1]
+		ticker := time.NewTicker(10 * time.Second)
 		for {
 			select {
-			case pkg := <-lastphase.inchan:
-				pkgs := m[pkg.key]
-				pkgs = append(pkgs, pkg)
-				m[pkg.key] = pkgs
+			case inmsg := <-lastphase.inchan:
+				key := inmsg.GetKey()
+				data := inmsg.GetData()
+				basemsgs := make([]Message, 0)
+				mrmsg, found := reduceM[key]
+				if found {
+					data = f(key, mrmsg.GetData(), data)
+					basemsgs = append(basemsgs, mrmsg.baseMessages...)
+				}
+				basemsgs = append(basemsgs, inmsg)
+				reduceM[key] = MRMessage{key: key, data: data, baseMessages: basemsgs}
 
 				bulkcount++
 				if bulkcount > 1000 {
 					clear()
 				}
-			case <-bigc:
-				clear()
 			case <-ticker.C:
 				clear()
 			}
@@ -360,11 +363,11 @@ func receive(brokers []string, topic, group string, donec <-chan KafkaMessage) <
 func (me *MapReducer) Pipe(topic string) *MapReducer {
 	me.Map(func(interface{}) string {
 		return ""
-	}).Reduce(func(key string, pkgs []Package) interface{} {
+	}).Reduce(func(key string, a, b interface{}) interface{} {
 		return nil
 	}).GlobalMap(nil, "", "", func(pkg interface{}) string { // auto save
 		return ""
-	}).Reduce(func(key string, pkgs []Package) interface{} { // if is the last one :save
+	}).Reduce(func(key string, a, b interface{}) interface{} { // if is the last one :save
 		return nil
 	})
 	return me
