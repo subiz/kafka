@@ -61,10 +61,14 @@ type MapReducer struct {
 
 type MapF func(interface{}) string // receive an object and return it's key
 type ReduceF func(string, interface{}, interface{}) interface{}
+type TransformF func(interface{}) interface{}
+type Sinker func(<-chan Message) chan<- Message
 
 type Reducer interface {
 	Map(f MapF) Mapper
 	GlobalMap(brokers []string, topic, csm string, f MapF) Mapper
+	Transform(TransformF) Reducer
+	Sink(topic string, f MapF)
 }
 
 type Mapper interface {
@@ -73,6 +77,57 @@ type Mapper interface {
 
 func NewMapReducer(csg, topic string) *MapReducer {
 	me := &MapReducer{}
+	return me
+}
+
+func (me *MapReducer) CreateKafkaSinker(brokers []string, topic string, f MapF) Sinker {
+	publisher := newHashedAsyncPublisher(brokers)
+	publishChan := publisher.Input()
+
+	go func() {
+		for {
+			select {
+			case msg := <-publisher.Successes():
+				msg.Metadata.(Message).Commit()
+			case err := <-publisher.Errors():
+				fmt.Println(err)
+			}
+		}
+	}()
+
+	return func(inchan <-chan Message) chan<- Message {
+		for mrmsg := range inchan {
+			key := f(mrmsg.GetData())
+			if msg := packMsg(topic, mrmsg, key); msg != nil {
+				publishChan <- msg
+			}
+		}
+	}
+}
+
+func (me *MapReducer) Sink(brokers []string, topic string, f MapF) {
+	lastphase := me.phases[len(me.phases)-1]
+
+	publisher := newHashedAsyncPublisher(brokers)
+	inchan := publisher.Input() // used to publish to kafka
+
+	go func() {
+		for {
+			select {
+			case msg := <-publisher.Successes():
+				msg.Metadata.(Message).Commit()
+			case err := <-publisher.Errors():
+				fmt.Println(err)
+			}
+		}
+	}()
+
+	for mrmsg := range lastphase.inchan {
+		key := f(mrmsg.GetData())
+		if msg := packMsg(topic, mrmsg, key); msg != nil {
+			inchan <- msg // publish to kafka
+		}
+	}
 	return me
 }
 
@@ -171,6 +226,21 @@ func (me *MapReducer) Map(f MapF) Mapper {
 		outc <- MRMessage{
 			key:          key,
 			data:         msg.GetData(),
+			baseMessages: []Message{msg},
+		}
+	}
+	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
+	return me
+}
+
+func (me *MapReducer) Transform(f TransformF) Reducer {
+	lastphase := me.phases[len(me.phases)-1]
+	outc := make(chan Message)
+
+	for msg := range lastphase.inchan {
+		newdata := f(msg.GetData())
+		outc <- MRMessage{
+			data:         newdata,
 			baseMessages: []Message{msg},
 		}
 	}
@@ -360,8 +430,20 @@ func receive(brokers []string, topic, group string, donec <-chan KafkaMessage) <
 	return outc
 }
 
+func Source() *MapReducer {
+	outc := make(chan Message)
+	go func() {
+		donec := make(chan KafkaMessage)
+		for msg := range receive(brokers, topic, group, donec) {
+			outc <- msg
+		}
+	}()
+	me.phases = append(me.phases, Phase{funcType: GLOBALMAP, outchan: outc})
+	return me
+}
+
 func (me *MapReducer) Pipe(topic string) *MapReducer {
-	me.Map(func(interface{}) string {
+	Source().Map(func(interface{}) string {
 		return ""
 	}).Reduce(func(key string, a, b interface{}) interface{} {
 		return nil
@@ -369,6 +451,7 @@ func (me *MapReducer) Pipe(topic string) *MapReducer {
 		return ""
 	}).Reduce(func(key string, a, b interface{}) interface{} { // if is the last one :save
 		return nil
+	}).Sink(func(string, interface{}) {
 	})
 	return me
 }
