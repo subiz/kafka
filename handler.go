@@ -234,9 +234,7 @@ loop:
 			if !more || msg == nil {
 				break loop
 			}
-			h.Lock()
 			h.exec.Add(string(msg.Key), Job{msg, h.term})
-			h.Unlock()
 		case ntf := <-h.consumer.Notifications():
 			if ntf == nil {
 				break loop
