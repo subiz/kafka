@@ -53,7 +53,7 @@ func NewUnoffsetConsumer(brokers []string, topic string, maxworkers, maxlag uint
 
 func (cs *Consumers) handleJob(_ string, job interface{}) {
 	mes := job.(*sarama.ConsumerMessage)
-	err := callHandler(cs.hs, mes.Value, 0, mes.Partition, mes.Offset)
+	err := callHandler(cs.hs, mes.Value, 0, mes.Partition, mes.Offset, string(mes.Key))
 	if err != nil && err != notfounderr {
 		log.Printf("topic %s:%d[%d]\n", mes.Topic, mes.Partition, mes.Offset)
 		log.Println(err)

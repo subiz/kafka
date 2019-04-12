@@ -83,7 +83,7 @@ func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, au
 	return NewHandlerFromCsm(csm, topic, maxworkers, maxlag, autocommit)
 }
 
-func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64) error {
+func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64, key string) error {
 	// examize val to get topic
 	payload := &cpb.Empty{}
 	topic, pctx := "", &cpb.Context{}
@@ -91,7 +91,7 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 		if p := payload.GetCtx(); p != nil {
 			pctx = p
 		}
-		topic = pctx.GetTopic()
+		topic = pctx.GetSubTopic()
 	} else {
 		log.Printf("invalid %s:%d[%d] %v\n", topic, par, offset, val)
 	}
@@ -109,7 +109,8 @@ func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par in
 		return err
 	}
 
-	pctx.Term, pctx.Offset, pctx.Partition = term, offset, par
+	pctx.KafkaTerm, pctx.KafkaOffset, pctx.KafkaPartition = term, offset, par
+	pctx.KafkaKey = key
 	ctxval := reflect.ValueOf(grpc.ToGrpcCtx(pctx))
 
 	hf.function.Call([]reflect.Value{ctxval, pptr})
@@ -162,7 +163,7 @@ func (h *Handler) handleJob(_ string, job interface{}) {
 
 	sq := h.createSqIfNotExist(mes.Partition, mes.Offset)
 	h.Unlock()
-	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset)
+	err := callHandler(h.hs, mes.Value, mes.Term, mes.Partition, mes.Offset, string(mes.Key))
 	if err != nil && err != notfounderr {
 		log.Printf("topic %s:%d[%d]\n", mes.Topic, mes.Partition, mes.Offset)
 		log.Println(err)
