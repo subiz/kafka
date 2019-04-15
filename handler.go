@@ -66,21 +66,21 @@ type Job struct {
 	Term uint64
 }
 
-func NewHandlerFromCsm(csm Consumer, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
+func NewHandlerFromCsm(csm Consumer, topic string, maxworkers uint, autocommit bool) *Handler {
 	h := &Handler{
 		RWMutex:     &sync.RWMutex{},
 		topic:       topic,
 		autocommit:  autocommit,
 		consumer:    csm,
-		squashercap: maxworkers * maxlag * 2,
+		squashercap: maxworkers * 100 * 2,
 	}
-	h.exec = executor.New(maxworkers, maxlag, h.handleJob)
+	h.exec = executor.New(maxworkers, h.handleJob)
 	return h
 }
 
-func NewHandler(brokers []string, csg, topic string, maxworkers, maxlag uint, autocommit bool) *Handler {
+func NewHandler(brokers []string, csg, topic string, maxworkers uint, autocommit bool) *Handler {
 	csm := newHandlerConsumer(brokers, topic, csg)
-	return NewHandlerFromCsm(csm, topic, maxworkers, maxlag, autocommit)
+	return NewHandlerFromCsm(csm, topic, maxworkers, autocommit)
 }
 
 func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64, key string) error {

@@ -20,7 +20,7 @@ type Consumers struct {
 	exec *executor.Executor
 }
 
-func NewUnoffsetConsumer(brokers []string, topic string, maxworkers, maxlag uint) (*Consumers, error) {
+func NewUnoffsetConsumer(brokers []string, topic string, maxworkers uint) (*Consumers, error) {
 	c := sarama.NewConfig()
 	c.Consumer.MaxWaitTime = 10000 * time.Millisecond
 	//c.Consumer.Offsets.Retention = 0
@@ -47,7 +47,7 @@ func NewUnoffsetConsumer(brokers []string, topic string, maxworkers, maxlag uint
 	}
 	consumers := &Consumers{}
 	consumers.consumers = cs
-	consumers.exec = executor.New(maxworkers, maxlag, consumers.handleJob)
+	consumers.exec = executor.New(maxworkers, consumers.handleJob)
 	return consumers, nil
 }
 
