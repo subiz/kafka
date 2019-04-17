@@ -2,6 +2,14 @@ package kafka
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/bsm/sarama-cluster"
 	"github.com/golang/protobuf/proto"
@@ -9,11 +17,6 @@ import (
 	"github.com/subiz/goutils/grpc"
 	cpb "github.com/subiz/header/common"
 	"github.com/subiz/squasher"
-	"log"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 )
 
 type R map[fmt.Stringer]interface{}
@@ -271,4 +274,10 @@ loop:
 		}
 	}
 	return h.consumer.Close()
+}
+
+func EndSignal() chan os.Signal {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	return signals
 }
