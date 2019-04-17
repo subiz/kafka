@@ -66,21 +66,35 @@ type Job struct {
 	Term uint64
 }
 
-func NewHandlerFromCsm(csm Consumer, topic string, maxworkers uint, autocommit bool) *Handler {
-	h := &Handler{
-		RWMutex:     &sync.RWMutex{},
-		topic:       topic,
-		autocommit:  autocommit,
-		consumer:    csm,
-		squashercap: maxworkers * 100 * 2,
+func NewHandler(brokers []string, csg, topic string, maxworkers uint, autocommit bool) *Handler {
+	c := cluster.NewConfig()
+	c.Consumer.MaxWaitTime = 10000 * time.Millisecond
+	//c.Consumer.Offsets.Retention = 0
+	c.Consumer.Return.Errors = true
+	c.Consumer.Offsets.Initial = sarama.OffsetOldest
+	c.Group.Session.Timeout = 20 * time.Second
+	c.Group.Return.Notifications = true
+
+	var csm *cluster.Consumer
+	var err error
+	for {
+		csm, err = cluster.NewConsumer(brokers, csg, []string{topic}, c)
+		if err != nil {
+			log.Println(err, "will retry...")
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
 	}
+
+	h := &Handler{}
+	h.RWMutex = &sync.RWMutex{}
+	h.topic = topic
+	h.autocommit = autocommit
+	h.consumer = csm
+	h.squashercap = maxworkers * 100 * 2
 	h.exec = executor.New(maxworkers, h.handleJob)
 	return h
-}
-
-func NewHandler(brokers []string, csg, topic string, maxworkers uint, autocommit bool) *Handler {
-	csm := newHandlerConsumer(brokers, topic, csg)
-	return NewHandlerFromCsm(csm, topic, maxworkers, autocommit)
 }
 
 func callHandler(handler map[string]handlerFunc, val []byte, term uint64, par int32, offset int64, key string) error {
@@ -257,23 +271,4 @@ loop:
 		}
 	}
 	return h.consumer.Close()
-}
-
-func newHandlerConsumer(brokers []string, topic, csg string) *cluster.Consumer {
-	c := cluster.NewConfig()
-	c.Consumer.MaxWaitTime = 10000 * time.Millisecond
-	//c.Consumer.Offsets.Retention = 0
-	c.Consumer.Return.Errors = true
-	c.Consumer.Offsets.Initial = sarama.OffsetOldest
-	c.Group.Session.Timeout = 20 * time.Second
-	c.Group.Return.Notifications = true
-
-	for {
-		csm, err := cluster.NewConsumer(brokers, csg, []string{topic}, c)
-		if err == nil {
-			return csm
-		}
-		log.Println(err, "will retry...")
-		time.Sleep(3 * time.Second)
-	}
 }
