@@ -50,21 +50,19 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	handlers, topic := me.handlers, me.topic
 	exec := executor.New(me.maxworkers, func(key string, p interface{}) {
 		msg := p.(*sarama.ConsumerMessage)
-		val, subtopic, pctx := msg.Value, "", &cpb.Context{}
-		ks := strings.Split(key, "-")
-		if len(ks) >= 2 {
-			subtopic = ks[0]
-		} else {
-			payload := &cpb.Empty{}
-			if err := proto.Unmarshal(val, payload); err == nil {
-				if p := payload.GetCtx(); p != nil {
-					pctx = p
-				}
-				subtopic = pctx.GetSubTopic()
-			}
+		val, pctx := msg.Value, &cpb.Context{}
+		// ks := strings.Split(key, "")
+		//if len(ks) >= 2 {
+		//subtopic = ks[0]
+		//} else {
+		var empty cpb.Empty
+		if err := proto.Unmarshal(val, &empty); err == nil {
+			pctx = empty.GetCtx()
 		}
+		//}
+		subtopic := pctx.GetSubTopic()
 		hf, ok := handlers[subtopic]
-		if !ok {
+		if !ok && subtopic != "" { // subtopic not found, fallback to default handler
 			subtopic = ""
 			hf = handlers[subtopic]
 		}
