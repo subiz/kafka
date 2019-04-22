@@ -85,6 +85,9 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 		case o := <-ofsc:
 			session.MarkOffset(topic, par, o, "")
 		case <-t.C:
+			if sq == nil {
+				continue
+			}
 			ss := strings.Split(sq.GetStatus(), " .. ")
 			if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
 				a, b, c := ss[0][1:], ss[1], ss[2][:len(ss[2])-1]
