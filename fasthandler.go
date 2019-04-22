@@ -68,12 +68,10 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 			subtopic = ""
 			hf = handlers[subtopic]
 		}
-		if hf == nil {
-			return
+		if hf != nil {
+			pctx.KafkaKey, pctx.KafkaOffset, pctx.KafkaPartition = key, msg.Offset, msg.Partition
+			hf(pctx, val)
 		}
-
-		pctx.KafkaKey, pctx.KafkaOffset, pctx.KafkaPartition = key, msg.Offset, msg.Partition
-		hf(pctx, val)
 		sq.Mark(msg.Offset)
 	})
 
@@ -120,7 +118,7 @@ func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
 	return &FastHandler{
 		brokers:       brokers,
 		consumergroup: consumergroup,
-		maxworkers:    10000,
+		maxworkers:    1000,
 		topic:         topic,
 	}
 }
