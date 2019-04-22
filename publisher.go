@@ -166,8 +166,7 @@ func (p *Publisher) Publish(topic string, data interface{}, par int32, key strin
 		if len(d) > 5000 {
 			d = d[len(d)-4000:]
 		}
-		log.Println("unable to publish message, topic: %s, partition %d, key %s, data: %s %v\n", topic, par, key, d, err)
-
+		log.Printf("unable to publish message, topic: %s, partition %d, key %s, data: %s %v\n", topic, par, key, d, err)
 		if err.Error() == sarama.ErrInvalidPartition.Error() ||
 			err.Error() == sarama.ErrMessageSizeTooLarge.Error() {
 			break
