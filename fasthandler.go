@@ -14,17 +14,41 @@ import (
 )
 
 type FastHandler struct {
-	maxworkers uint
-	topic      string
-	handlers   map[string]func(*cpb.Context, []byte)
-	rebalanceF func([]int32) error
+	brokers       []string
+	consumergroup string
+	topic         string
 
-	// exec is job balancer
-	exec *executor.Executor
+	group sarama.ConsumerGroup
+
+	maxworkers uint
+	handlers   map[string]func(*cpb.Context, []byte)
+	rebalanceF func([]int32)
+
+	stopped bool
 }
 
 func (me *FastHandler) Setup(session sarama.ConsumerGroupSession) error {
-	me.exec = executor.New(me.maxworkers, func(key string, p interface{}) {
+	if me.rebalanceF != nil {
+		me.rebalanceF(session.Claims()[me.topic])
+	}
+	return nil
+}
+
+func (me *FastHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
+	if me.rebalanceF != nil {
+		me.rebalanceF(nil)
+	}
+	return nil
+}
+
+func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	par := claim.Partition()
+	var sq *squasher.Squasher
+	ofsc := make(<-chan int64)
+	t := time.NewTicker(1 * time.Second)
+
+	handlers, topic := me.handlers, me.topic
+	exec := executor.New(me.maxworkers, func(key string, p interface{}) {
 		msg := p.(*sarama.ConsumerMessage)
 		val, subtopic, pctx := msg.Value, "", &cpb.Context{}
 		ks := strings.Split(key, "-")
@@ -39,41 +63,27 @@ func (me *FastHandler) Setup(session sarama.ConsumerGroupSession) error {
 				subtopic = pctx.GetSubTopic()
 			}
 		}
-
-		hf, ok := me.handlers[subtopic]
-		if !ok || hf == nil {
+		hf, ok := handlers[subtopic]
+		if !ok {
+			subtopic = ""
+			hf = handlers[subtopic]
+		}
+		if hf == nil {
 			return
 		}
 
 		pctx.KafkaKey, pctx.KafkaOffset, pctx.KafkaPartition = key, msg.Offset, msg.Partition
 		hf(pctx, val)
+		sq.Mark(msg.Offset)
 	})
-	if me.rebalanceF != nil {
-		return me.rebalanceF(session.Claims()[me.topic])
-	}
-	return nil
-}
 
-func (me *FastHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
-	if me.rebalanceF != nil {
-		return me.rebalanceF(nil)
-	}
-	return nil
-}
+	defer exec.Wait()
 
-func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	par := claim.Partition()
-	log.Println("Kafka Info #852459 start comsume partition ", par, " of topic ", claim.Topic(),
-		" at ", claim.InitialOffset())
-	initOffset := claim.InitialOffset()
-	sq := squasher.NewSquasher(initOffset, int32(me.maxworkers*100*2)) // 1M
-	ofsc := sq.Next()
-	t := time.NewTicker(1 * time.Second)
-
+	initOffset := int64(-1)
 	for {
 		select {
 		case o := <-ofsc:
-			session.MarkOffset(me.topic, par, o, "")
+			session.MarkOffset(topic, par, o, "")
 		case <-t.C:
 			ss := strings.Split(sq.GetStatus(), " .. ")
 			if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
@@ -82,50 +92,69 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 					log.Println("Handle status ", par, sq.GetStatus())
 				}
 			}
-		case x := <-session.Context().Done():
-			log.Println("CANCELLED", claim.Partition(), x)
+		case <-session.Context().Done():
+			log.Println("KAFKA FORCE EXIT AT PARTITION", claim.Partition())
 			return nil
 		case msg, more := <-claim.Messages():
 			if !more {
 				return nil
 			}
 
-			if msg.Offset <= initOffset {
-				continue
+			if initOffset < 0 { // just call once
+				initOffset = msg.Offset
+				log.Println("Kafka Info #852459 start comsume partition", par, "of topic",
+					claim.Topic(), "at", initOffset)
+				sq = squasher.NewSquasher(initOffset, int32(me.maxworkers*100*2)) // 1M
+				ofsc = sq.Next()
 			}
-			me.exec.Add(string(msg.Key), msg)
+			exec.Add(string(msg.Key), msg)
 		}
 	}
 }
 
-func NewFastHandler(brokers []string, consumergroup, topic string,
-	handlers map[string]func(*cpb.Context, []byte),
-	rebalanceF func([]int32) error) error {
+// NewHandler creates a new Handler object
+func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
+	return &FastHandler{
+		brokers:       brokers,
+		consumergroup: consumergroup,
+		maxworkers:    10000,
+		topic:         topic,
+	}
+}
+
+// Stop stops listening for new kafka message
+func (me *FastHandler) Stop() {
+	if me.group != nil && !me.stopped {
+		me.stopped = true
+		me.group.Close()
+	}
+}
+
+func (me *FastHandler) Serve(handlers map[string]func(*cpb.Context, []byte),
+	rebalanceF func([]int32)) {
 	c := sarama.NewConfig()
 	c.Version = sarama.V2_1_0_0
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
-	group, err := sarama.NewConsumerGroup(brokers, consumergroup, c)
+	group, err := sarama.NewConsumerGroup(me.brokers, me.consumergroup, c)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
+	me.handlers, me.rebalanceF = handlers, rebalanceF
 	go func() {
-		for {
-			select {
-			case err := <-group.Errors():
-				if err != nil {
-					log.Printf("Kafka err #24525294: %s\n", err.Error())
-				}
-			}
+		for err := range group.Errors() {
+			log.Printf("Kafka err #24525294: %s\n", err.Error())
 		}
 	}()
 
-	handler := &FastHandler{topic: topic, handlers: handlers, rebalanceF: rebalanceF}
-	for {
-		err = group.Consume(context.Background(), []string{topic}, handler)
+	me.stopped = false
+	for !me.stopped {
+		err = group.Consume(context.Background(), []string{me.topic}, me)
 		if err != nil {
-			return err
+			log.Printf("Kafka err #222293: %s\nRetry in 2 secs\n", err.Error())
+			time.Sleep(2 * time.Second)
 		}
 	}
+	group.Close()
 }
