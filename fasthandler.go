@@ -20,7 +20,7 @@ type FastHandler struct {
 
 	group sarama.ConsumerGroup
 
-	maxworkers uint
+	maxworkers uint // maxworkers per partition
 	handlers   map[string]func(*cpb.Context, []byte)
 	rebalanceF func([]int32)
 
@@ -116,7 +116,7 @@ func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
 	return &FastHandler{
 		brokers:       brokers,
 		consumergroup: consumergroup,
-		maxworkers:    1000,
+		maxworkers:    50,
 		topic:         topic,
 	}
 }
