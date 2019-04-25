@@ -57,7 +57,9 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 		//} else {
 		var empty cpb.Empty
 		if err := proto.Unmarshal(val, &empty); err == nil {
-			pctx = empty.GetCtx()
+			if empty.GetCtx() != nil {
+				pctx = empty.GetCtx()
+			}
 		}
 		//}
 		subtopic := pctx.GetSubTopic()
