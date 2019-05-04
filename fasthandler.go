@@ -19,7 +19,7 @@ type FastHandler struct {
 	brokers       []string
 	consumergroup string
 	topic         string
-	clientID      string // kafka client id, for debugging
+	ClientID      string // kafka client id, for debugging
 
 	group sarama.ConsumerGroup
 
@@ -132,7 +132,7 @@ func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
 		consumergroup: consumergroup,
 		maxworkers:    50,
 		topic:         topic,
-		clientID:      randomHex(30),
+		ClientID:      randomHex(30),
 	}
 }
 
@@ -148,7 +148,7 @@ func (me *FastHandler) Serve(handlers map[string]func(*cpb.Context, []byte),
 	rebalanceF func([]int32)) {
 	c := sarama.NewConfig()
 	c.Version = sarama.V2_1_0_0
-	c.ClientID = me.clientID
+	c.ClientID = me.ClientID
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
 	group, err := sarama.NewConsumerGroup(me.brokers, me.consumergroup, c)
