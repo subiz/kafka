@@ -2,9 +2,8 @@ package kafka
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -116,23 +115,15 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	}
 }
 
-func randomHex(n int) string {
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	if err != nil {
-		panic(err)
-	}
-	return hex.EncodeToString(b)
-}
-
 // NewHandler creates a new Handler object
 func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
+	hostname, _ := os.Hostname()
 	return &FastHandler{
 		brokers:       brokers,
 		consumergroup: consumergroup,
 		maxworkers:    50,
 		topic:         topic,
-		ClientID:      randomHex(30),
+		ClientID:      hostname,
 	}
 }
 
