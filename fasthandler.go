@@ -97,7 +97,8 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	for {
 		select {
 		case o := <-ofsc:
-			session.MarkOffset(topic, par, o, "")
+			// o+1 because we want consumer offset to point to the next message
+			session.MarkOffset(topic, par, o+1, "")
 		case <-t.C:
 			if sq == nil {
 				continue
