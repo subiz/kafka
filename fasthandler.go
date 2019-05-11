@@ -90,7 +90,11 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 		sq.Mark(msg.Offset)
 	})
 
-	defer exec.Wait()
+	defer func() {
+		exec.Wait()
+		exec.Stop()  // clean up resource
+	}()
+
 
 	firstmessage := true
 	t := time.NewTicker(1 * time.Second) // used to check slow consumer
