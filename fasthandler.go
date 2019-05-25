@@ -34,10 +34,12 @@ type FastHandler struct {
 
 	// holds a map of function which will be trigger on every kafka messages.
 	// it maps subtopic to a function
-	handlers   map[string]func(*cpb.Context, []byte)
+	handlers map[string]func(*cpb.Context, []byte)
 
 	// a callback function that will be trigger every time the group is rebalanced
 	rebalanceF func([]int32)
+
+	group sarama.ConsumerGroup
 }
 
 // Setup implements sarama.ConsumerGroupHandler.Setup, it is run at the
@@ -92,9 +94,8 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 
 	defer func() {
 		exec.Wait()
-		exec.Stop()  // clean up resource
+		exec.Stop() // clean up resource
 	}()
-
 
 	firstmessage := true
 	t := time.NewTicker(1 * time.Second) // used to check slow consumer
@@ -152,23 +153,28 @@ func (me *FastHandler) Serve(handlers map[string]func(*cpb.Context, []byte),
 	c.ClientID = me.ClientID
 	c.Consumer.Return.Errors = true
 	c.Consumer.Offsets.Initial = sarama.OffsetOldest
-	group, err := sarama.NewConsumerGroup(me.brokers, me.consumergroup, c)
+	var err error
+	me.group, err = sarama.NewConsumerGroup(me.brokers, me.consumergroup, c)
 	if err != nil {
 		panic(err)
 	}
 
 	me.handlers, me.rebalanceF = handlers, rebalanceF
 	go func() {
-		for err := range group.Errors() {
+		for err := range me.group.Errors() {
 			log.Printf("Kafka err #24525294: %s\n", err.Error())
 		}
 	}()
 
 	for {
-		err = group.Consume(context.Background(), []string{me.topic}, me)
+		err = me.group.Consume(context.Background(), []string{me.topic}, me)
 		if err != nil {
 			log.Printf("Kafka err #222293: %s\nRetry in 2 secs\n", err.Error())
 			time.Sleep(2 * time.Second)
 		}
 	}
+}
+
+func (me *FastHandler) Close() error {
+	return me.group.Close()
 }
