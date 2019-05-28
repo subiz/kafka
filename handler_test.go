@@ -25,8 +25,8 @@ func TestRebalance(t *testing.T) {
 	}()
 	var ids = &sync.Map{}
 	var done = make(chan bool)
-	h := NewHandler(g_brokers, "grp1452", "test10")
-	go h.Serve(map[string]func(*cpb.Context, []byte){
+	h := NewHandler(g_brokers, "grp1452", "test10", true)
+	go h.Serve(map[string]H{
 		"": func(ctx *cpb.Context, b []byte) {
 			select {
 			case done <- true:
@@ -37,10 +37,10 @@ func TestRebalance(t *testing.T) {
 	}, func(pars []int32) { log.Println("#5829222 got partition", pars) })
 	<-done
 	println("DONE")
-	h.Stop()
+	h.Close()
 
 	for i := 0; i < 3; i++ {
-		go h.Serve(map[string]func(*cpb.Context, []byte){
+		go h.Serve(map[string]H{
 			"": func(ctx *cpb.Context, b []byte) {
 				if !strings.Contains(ctx.GetKafkaKey(), now) {
 					return
@@ -60,7 +60,7 @@ func TestRebalance(t *testing.T) {
 	}
 	<-done
 	time.Sleep(2 * time.Second)
-	h.Stop()
+	h.Close()
 }
 
 // ./kafka-topics.sh --zookeeper zookeeper --alter --topic test10 --partitions 10
@@ -76,8 +76,8 @@ func TestSimple(t *testing.T) {
 	}()
 	var ids = &sync.Map{}
 	var done = make(chan bool)
-	h := NewHandler(g_brokers, "grp1", "test10")
-	go h.Serve(map[string]func(*cpb.Context, []byte){
+	h := NewHandler(g_brokers, "grp1", "test10", true)
+	go h.Serve(map[string]H{
 		"": func(ctx *cpb.Context, b []byte) {
 			if !strings.Contains(ctx.GetKafkaKey(), now) {
 				return
