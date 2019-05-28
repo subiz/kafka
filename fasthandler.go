@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -40,6 +41,11 @@ type FastHandler struct {
 	rebalanceF func([]int32)
 
 	group sarama.ConsumerGroup
+
+	auto_commit bool
+
+	sqlock *sync.Mutex // protect sqmap
+	sqmap  map[int32]*squasher.Squasher
 }
 
 // Setup implements sarama.ConsumerGroupHandler.Setup, it is run at the
@@ -55,6 +61,9 @@ func (me *FastHandler) Setup(session sarama.ConsumerGroupSession) error {
 // end of a session, once all ConsumeClaim goroutines have exited but
 // before the offsets are committed for the very last time.
 func (me *FastHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
+	me.sqlock.Lock()
+	me.sqmap = nil
+	me.sqlock.Unlock()
 	if me.rebalanceF != nil {
 		me.rebalanceF(nil)
 	}
@@ -89,7 +98,9 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 			pctx.KafkaKey, pctx.KafkaOffset, pctx.KafkaPartition = key, msg.Offset, msg.Partition
 			hf(pctx, val)
 		}
-		sq.Mark(msg.Offset)
+		if me.auto_commit {
+			sq.Mark(msg.Offset)
+		}
 	})
 
 	defer func() {
@@ -127,6 +138,9 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 					claim.Topic(), "at", msg.Offset)
 				sq = squasher.NewSquasher(msg.Offset, int32(me.maxworkers*100*2)) // 1M
 				ofsc = sq.Next()
+				me.sqlock.Lock()
+				me.sqmap[par] = sq
+				me.sqlock.Unlock()
 			}
 			exec.Add(string(msg.Key), msg)
 		}
@@ -134,7 +148,7 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 }
 
 // NewHandler creates a new FastHandler object
-func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
+func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) *FastHandler {
 	hostname, _ := os.Hostname()
 	return &FastHandler{
 		brokers:       brokers,
@@ -142,6 +156,9 @@ func NewHandler(brokers []string, consumergroup, topic string) *FastHandler {
 		maxworkers:    50,
 		topic:         topic,
 		ClientID:      hostname,
+		sqlock:        &sync.Mutex{},
+		sqmap:         make(map[int32]*squasher.Squasher, 0),
+		auto_commit:   autocommit,
 	}
 }
 
@@ -177,4 +194,12 @@ func (me *FastHandler) Serve(handlers map[string]func(*cpb.Context, []byte),
 
 func (me *FastHandler) Close() error {
 	return me.group.Close()
+}
+
+func (me *FastHandler) Commit(partition int32, offset int64) {
+	me.sqlock.Lock()
+	if sq := me.sqmap[partition]; sq != nil {
+		sq.Mark(offset)
+	}
+	me.sqlock.Unlock()
 }
