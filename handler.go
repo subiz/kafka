@@ -35,7 +35,7 @@ type FastHandler struct {
 
 	// holds a map of function which will be trigger on every kafka messages.
 	// it maps subtopic to a function
-	handlers map[string]func(*cpb.Context, []byte)
+	handlers map[string]H
 
 	// a callback function that will be trigger every time the group is rebalanced
 	rebalanceF func([]int32)
@@ -162,9 +162,10 @@ func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) 
 	}
 }
 
+type H func(*cpb.Context, []byte)
+
 // Serve listens messages from kafka and call matched handlers
-func (me *FastHandler) Serve(handlers map[string]func(*cpb.Context, []byte),
-	rebalanceF func([]int32)) {
+func (me *FastHandler) Serve(handlers map[string]H, rebalanceF func([]int32)) {
 	c := sarama.NewConfig()
 	c.Version = sarama.V2_1_0_0
 	c.ClientID = me.ClientID
