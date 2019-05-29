@@ -84,7 +84,7 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 	ofsc := make(<-chan int64)
 
 	handlers, topic := me.handlers, me.topic
-	exec := executor.New(me.maxworkers, 100, func(key string, p interface{}) {
+	exec := executor.New(me.maxworkers, func(key string, p interface{}) {
 		msg := p.(*sarama.ConsumerMessage)
 		val, pctx := msg.Value, &cpb.Context{}
 		var empty cpb.Empty
