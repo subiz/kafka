@@ -15,9 +15,9 @@ import (
 	"github.com/subiz/squasher"
 )
 
-// FastHandler is used to consumer kafka messages. Unlike default consumer, it
+// Handler is used to consumer kafka messages. Unlike default consumer, it
 // supports routing using sub topic, parallel execution and auto commit.
-type FastHandler struct {
+type Handler struct {
 	// holds address of kafka brokers, eg: ['kafka-0:9092', 'kafka-1:9092']
 	brokers []string
 
@@ -35,22 +35,26 @@ type FastHandler struct {
 
 	// holds a map of function which will be trigger on every kafka messages.
 	// it maps subtopic to a function
-	handlers map[string]H
+	handlers H
 
 	// a callback function that will be trigger every time the group is rebalanced
 	rebalanceF func([]int32)
 
 	group sarama.ConsumerGroup
 
+	// commit kafka event automatically when handle returned
 	auto_commit bool
 
 	sqlock *sync.Mutex // protect sqmap
 	sqmap  map[int32]*squasher.Squasher
 }
 
+// syntax suggar for define a map of event hander, with the key is the topic
+type H map[string]func(*cpb.Context, []byte)
+
 // Setup implements sarama.ConsumerGroupHandler.Setup, it is run at the
 // beginning of a new session, before ConsumeClaim.
-func (me *FastHandler) Setup(session sarama.ConsumerGroupSession) error {
+func (me *Handler) Setup(session sarama.ConsumerGroupSession) error {
 	if me.rebalanceF != nil {
 		me.rebalanceF(session.Claims()[me.topic])
 	}
@@ -60,7 +64,7 @@ func (me *FastHandler) Setup(session sarama.ConsumerGroupSession) error {
 // Cleanup impements sarama.ConsumerGroupHandler.Cleanup, it is run at the
 // end of a session, once all ConsumeClaim goroutines have exited but
 // before the offsets are committed for the very last time.
-func (me *FastHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
+func (me *Handler) Cleanup(_ sarama.ConsumerGroupSession) error {
 	me.sqlock.Lock()
 	me.sqmap = nil
 	me.sqlock.Unlock()
@@ -74,7 +78,7 @@ func (me *FastHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
 // start a consumer loop of ConsumerGroupClaim's Messages().
 // Once the Messages() channel is closed, the Handler must finish its processing
 // loop and exit.
-func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	par := claim.Partition()
 	var sq *squasher.Squasher
 	ofsc := make(<-chan int64)
@@ -147,10 +151,10 @@ func (me *FastHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	}
 }
 
-// NewHandler creates a new FastHandler object
-func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) *FastHandler {
+// NewHandler creates a new Handler object
+func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) *Handler {
 	hostname, _ := os.Hostname()
-	return &FastHandler{
+	return &Handler{
 		brokers:       brokers,
 		consumergroup: consumergroup,
 		maxworkers:    50,
@@ -162,10 +166,8 @@ func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) 
 	}
 }
 
-type H func(*cpb.Context, []byte)
-
 // Serve listens messages from kafka and call matched handlers
-func (me *FastHandler) Serve(handlers map[string]H, rebalanceF func([]int32)) {
+func (me *Handler) Serve(handlers H, rebalanceF func([]int32)) {
 	c := sarama.NewConfig()
 	c.Version = sarama.V2_1_0_0
 	c.ClientID = me.ClientID
@@ -193,11 +195,12 @@ func (me *FastHandler) Serve(handlers map[string]H, rebalanceF func([]int32)) {
 	}
 }
 
-func (me *FastHandler) Close() error {
-	return me.group.Close()
-}
+// Close stops the handler and detaches any running sessions
+func (me *Handler) Close() error { return me.group.Close() }
 
-func (me *FastHandler) Commit(partition int32, offset int64) {
+// Commit marks kafka event as processed so it won't restream next time server
+// is started
+func (me *Handler) Commit(partition int32, offset int64) {
 	me.sqlock.Lock()
 	if sq := me.sqmap[partition]; sq != nil {
 		sq.Mark(offset)
