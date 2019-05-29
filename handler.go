@@ -66,7 +66,7 @@ func (me *Handler) Setup(session sarama.ConsumerGroupSession) error {
 // before the offsets are committed for the very last time.
 func (me *Handler) Cleanup(_ sarama.ConsumerGroupSession) error {
 	me.sqlock.Lock()
-	me.sqmap = nil
+	me.sqmap = make(map[int32]*squasher.Squasher)
 	me.sqlock.Unlock()
 	if me.rebalanceF != nil {
 		me.rebalanceF(nil)
