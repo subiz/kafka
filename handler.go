@@ -10,6 +10,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
+	"github.com/paulbellamy/ratecounter"
 	"github.com/subiz/executor"
 	cpb "github.com/subiz/header/common"
 	"github.com/subiz/squasher"
@@ -47,6 +48,7 @@ type Handler struct {
 
 	sqlock *sync.Mutex // protect sqmap
 	sqmap  map[int32]*squasher.Squasher
+
 }
 
 // syntax suggar for define a map of event hander, with the key is the topic
@@ -112,6 +114,8 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 		exec.Stop() // clean up resource
 	}()
 
+	counter := ratecounter.NewRateCounter(1 * time.Second)
+
 	firstmessage := true
 	t := time.NewTicker(1 * time.Second) // used to check slow consumer
 	for {
@@ -123,6 +127,8 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 			if sq == nil {
 				continue
 			}
+
+			log.Println("KAFKA RATE: ", topic, counter.Rate())
 			ss := strings.Split(sq.GetStatus(), " .. ")
 			if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
 				a, b, c := ss[0][1:], ss[1], ss[2][:len(ss[2])-1]
@@ -135,6 +141,8 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 				log.Println("KAFKA FORCE EXIT AT PARTITION", claim.Partition())
 				return nil
 			}
+
+			counter.Incr(1)
 
 			if firstmessage {
 				firstmessage = false
