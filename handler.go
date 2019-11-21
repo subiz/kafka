@@ -49,6 +49,7 @@ type Handler struct {
 	sqlock *sync.Mutex // protect sqmap
 	sqmap  map[int32]*squasher.Squasher
 
+	counter *ratecounter.RateCounter
 }
 
 // syntax suggar for define a map of event hander, with the key is the topic
@@ -114,8 +115,6 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 		exec.Stop() // clean up resource
 	}()
 
-	counter := ratecounter.NewRateCounter(1 * time.Second)
-
 	firstmessage := true
 	t := time.NewTicker(1 * time.Second) // used to check slow consumer
 	for {
@@ -128,7 +127,6 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 				continue
 			}
 
-			log.Println("KAFKA RATE: ", topic, counter.Rate())
 			ss := strings.Split(sq.GetStatus(), " .. ")
 			if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
 				a, b, c := ss[0][1:], ss[1], ss[2][:len(ss[2])-1]
@@ -142,7 +140,7 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 				return nil
 			}
 
-			counter.Incr(1)
+			me.counter.Incr(1)
 
 			if firstmessage {
 				firstmessage = false
@@ -187,10 +185,19 @@ func (me *Handler) Serve(handlers H, rebalanceF func([]int32)) {
 		panic(err)
 	}
 
+	me.counter = ratecounter.NewRateCounter(1 * time.Second)
+
 	me.handlers, me.rebalanceF = handlers, rebalanceF
 	go func() {
 		for err := range me.group.Errors() {
 			log.Printf("Kafka err #24525294: %s\n", err.Error())
+		}
+	}()
+
+	go func() {
+		for {
+			log.Println("KAFKA RATE", me.topic, me.counter.Rate())
+			time.Sleep(4 * time.Second)
 		}
 	}()
 
