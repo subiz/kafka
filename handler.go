@@ -146,7 +146,7 @@ func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim saram
 				firstmessage = false
 				log.Println("Kafka Info #852459 start comsume partition", par, "of topic",
 					claim.Topic(), "at", msg.Offset)
-				sq = squasher.NewSquasher(msg.Offset, int32(me.maxworkers*100*2)) // 1M
+				sq = squasher.NewSquasher(msg.Offset, int32(me.maxworkers*100000)) // 800k item each worker
 				ofsc = sq.Next()
 				me.sqlock.Lock()
 				me.sqmap[par] = sq
