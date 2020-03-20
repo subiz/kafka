@@ -9,8 +9,7 @@ require (
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
 	github.com/subiz/executor v1.0.1
-	github.com/subiz/header v0.0.198
+	github.com/subiz/header v0.0.199
 	github.com/subiz/squasher v1.0.0
 	golang.org/x/crypto v0.0.0-20200317142112-1b76d66859c6 // indirect
-	golang.org/x/net v0.0.0-20200319234117-63522dbf7eec // indirect
 )
