@@ -19,6 +19,8 @@ import (
 // Handler is used to consumer kafka messages. Unlike default consumer, it
 // supports routing using sub topic, parallel execution and auto commit.
 type Handler struct {
+	EnableLog bool
+
 	// holds address of kafka brokers, eg: ['kafka-0:9092', 'kafka-1:9092']
 	brokers []string
 
@@ -163,7 +165,7 @@ func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) 
 	return &Handler{
 		brokers:       brokers,
 		consumergroup: consumergroup,
-		maxworkers:    50,
+		maxworkers:    5,
 		topic:         topic,
 		ClientID:      hostname,
 		sqlock:        &sync.Mutex{},
@@ -194,12 +196,14 @@ func (me *Handler) Serve(handlers H, rebalanceF func([]int32)) {
 		}
 	}()
 
-	go func() {
-		for {
-			log.Println("KAFKA RATE", me.topic, me.counter.Rate())
-			time.Sleep(4 * time.Second)
-		}
-	}()
+	if me.EnableLog {
+		go func() {
+			for {
+				log.Println("KAFKA RATE", me.topic, me.counter.Rate())
+				time.Sleep(4 * time.Second)
+			}
+		}()
+	}
 
 	for {
 		err = me.group.Consume(context.Background(), []string{me.topic}, me)
