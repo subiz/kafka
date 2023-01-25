@@ -23,7 +23,7 @@ KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
 Format Log Directories
 
 ```sh
-$ bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/kraft/server.properties
+$ /opt/kafka/bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/kraft/server.properties
 ```
 Start the Kafka Server
 `
@@ -31,6 +31,13 @@ $ bin/kafka-server-start.sh config/kraft/server.properties
 `
 Once the Kafka server has successfully launched, you will have a basic Kafka environment running and ready to use.
 
+### Config kafka
+Edit `/opt/kafka/config/server.properties`
+Change `broker.id=0` to `broker.id=1`
+Change `num.partitions=1` to `num.partitions=50`
+Add `listeners=PLAINTEXT://kafka-1:9092`
+Add `advertised.listeners=PLAINTEXT://kafka-1:9092`
+Also, change the listeners key in `/opt/kafka/config/kraft/broker.properties` and `/opt/kafka/config/kraft/server.properties`
 
 ### Create service
 ```sh
@@ -61,11 +68,10 @@ Start kafkaf
 systemctl start kafka
 ```
 
-
 ### Tesing
 #### Create a topic
 ```sh
-/opt/kafka/bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic foo --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 ```
 All of Kafka's command line tools have additional options: run the kafka-topics.sh command without any arguments to display usage information. For example, it can also show you details such as the partition count of the new topic:
 ```sh

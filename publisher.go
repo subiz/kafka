@@ -14,6 +14,11 @@ var producer sarama.SyncProducer
 var hashedproducer sarama.SyncProducer
 var started bool
 var lock = &sync.Mutex{}
+var g_brokers = []string{"kafka-1:9092"}
+
+func SetBrokers(brokers []string) {
+	g_brokers = brokers
+}
 
 func prepareProducer() {
 	if started {
@@ -26,7 +31,6 @@ func prepareProducer() {
 		return
 	}
 
-	brokers := []string{"kafka-1"}
 	var err error
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewManualPartitioner

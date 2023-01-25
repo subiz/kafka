@@ -20,7 +20,7 @@ type HandlerFunc func(topic string, partition int32, data []byte)
 // Serve listens messages from kafka and call matched handlers
 func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
 	if len(addrs) == 0 {
-		addrs = []string{"kafka-1"}
+		addrs = g_brokers
 	}
 	// hostname, _ = os.Hostname()
 
