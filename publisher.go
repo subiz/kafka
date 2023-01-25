@@ -3,6 +3,7 @@ package kafka
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -11,8 +12,20 @@ import (
 
 var producer sarama.SyncProducer
 var hashedproducer sarama.SyncProducer
+var started bool
+var lock = &sync.Mutex{}
 
-func init() {
+func prepareProducer() {
+	if started {
+		return
+	}
+
+	lock.Lock()
+	if started {
+		lock.Unlock()
+		return
+	}
+
 	brokers := []string{"kafka-1"}
 	var err error
 	config := sarama.NewConfig()
@@ -22,7 +35,7 @@ func init() {
 
 	producer, err = sarama.NewSyncProducer(brokers, config)
 	for err != nil {
-		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
+		log.Println("can't create sync producer to ", brokers, "retries in 5 sec", err)
 		time.Sleep(5 * time.Second)
 		producer, err = sarama.NewSyncProducer(brokers, config)
 	}
@@ -34,10 +47,12 @@ func init() {
 
 	hashedproducer, err = sarama.NewSyncProducer(brokers, config)
 	for err != nil {
-		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
+		log.Println("can't create sync producer to ", brokers, "retries in 5 sec", err)
 		time.Sleep(5 * time.Second)
 		hashedproducer, err = sarama.NewSyncProducer(brokers, config)
 	}
+	started = true
+	lock.Unlock()
 }
 
 func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.ProducerMessage {
@@ -80,6 +95,8 @@ func Publish(topic string, data interface{}, keys ...string) {
 }
 
 func PublishToPartition(topic string, data interface{}, par int32, key string) {
+	prepareProducer()
+
 	msg := prepareMsg(topic, data, par, key)
 	if msg == nil {
 		log.Println("no publish")
