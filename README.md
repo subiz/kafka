@@ -1,37 +1,4 @@
 
-### Mount disk
-```sh
-$ lsblk
-NAME    MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
-loop0     7:0    0  55.6M  1 loop /snap/core18/2667
-loop1     7:1    0  63.3M  1 loop /snap/core20/1778
-loop2     7:2    0 295.6M  1 loop /snap/google-cloud-cli/95
-loop3     7:3    0   103M  1 loop /snap/lxd/23541
-loop4     7:4    0  49.6M  1 loop /snap/snapd/17883
-sda       8:0    0    50G  0 disk
-├─sda1    8:1    0  49.9G  0 part /
-├─sda14   8:14   0     4M  0 part
-└─sda15   8:15   0   106M  0 part /boot/efi
-sdb       8:16   0   300G  0 disk
-
-# sudo mkfs.ext4 -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/sdb
-# sudo mkdir -p /data
-# sudo mount -o discard,defaults /dev/sdb /data
-# sudo chmod a+w /data
-
-```
-Config mount disk automatically after restart
-
-```sh
-# sudo cp /etc/fstab /etc/fstab.backup
-# sudo blkid /dev/sdb
-/dev/sdb: UUID="c26abef3-34ef-4411-85b9-b4ef8ad18ead" BLOCK_SIZE="4096" TYPE="ext4"
-```
-Edit `/etc/fstab`, append
-```
-UUID="c26abef3-34ef-4411-85b9-b4ef8ad18ead" /data ext4 discard,defaults,MOUNT_OPTION 0 2
-```
-
 ## Install java
 ```sh
 sudo apt install openjdk-19-jdk

@@ -6,83 +6,38 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-type Publisher struct {
-	brokers             []string
-	producer            sarama.SyncProducer
-	hashedproducer      sarama.SyncProducer
-	asyncproducer       sarama.AsyncProducer
-	hashedasyncproducer sarama.AsyncProducer
-}
+var producer sarama.SyncProducer
+var hashedproducer sarama.SyncProducer
 
-func newHashedSyncPublisher(brokers []string) sarama.SyncProducer {
-	config := sarama.NewConfig()
-	config.Producer.Partitioner = sarama.NewHashPartitioner
-	config.Producer.Return.Successes = true
-	producer, err := sarama.NewSyncProducer(brokers, config)
-	for err != nil {
-		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
-		time.Sleep(5 * time.Second)
-		producer, err = sarama.NewSyncProducer(brokers, config)
-}
-	return producer
-}
-
-func newSyncPublisher(brokers []string) sarama.SyncProducer {
+func init() {
+	brokers := []string{"kafka-1"}
+	var err error
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewManualPartitioner
 	config.Producer.Return.Successes = true
-	producer, err := sarama.NewSyncProducer(brokers, config)
+	config.Producer.Return.Errors = true
+
+	producer, err = sarama.NewSyncProducer(brokers, config)
 	for err != nil {
 		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
 		time.Sleep(5 * time.Second)
 		producer, err = sarama.NewSyncProducer(brokers, config)
 	}
-	return producer
-}
 
-func newAsyncPublisher(brokers []string) sarama.AsyncProducer {
-	config := sarama.NewConfig()
-	config.Producer.Partitioner = sarama.NewManualPartitioner
-
-	config.Producer.Return.Successes = true
-	// config.Producer.RequireAcks = sarama.WaitForAll
-	producer, err := sarama.NewAsyncProducer(brokers, config)
-	for err != nil {
-		log.Println("can't create async producer to ", brokers, "retries in 5 sec")
-		time.Sleep(5 * time.Second)
-		producer, err = sarama.NewAsyncProducer(brokers, config)
-	}
-	return producer
-}
-
-func newHashedAsyncPublisher(brokers []string) sarama.AsyncProducer {
-	config := sarama.NewConfig()
+	config = sarama.NewConfig()
 	config.Producer.Partitioner = sarama.NewHashPartitioner
-
 	config.Producer.Return.Successes = true
-	// config.Producer.RequireAcks = sarama.WaitForAll
-	producer, err := sarama.NewAsyncProducer(brokers, config)
-	for err != nil {
-		log.Println("can't create async producer to ", brokers, "retries in 5 sec")
-		time.Sleep(5 * time.Second)
-		producer, err = sarama.NewAsyncProducer(brokers, config)
-	}
-	return producer
-}
+	config.Producer.Return.Errors = true
 
-func NewPublisher(brokers []string) *Publisher {
-	p := &Publisher{
-		brokers:             brokers,
-		producer:            newSyncPublisher(brokers),
-		hashedproducer:      newHashedSyncPublisher(brokers),
-		asyncproducer:       newAsyncPublisher(brokers),
-		hashedasyncproducer: newHashedAsyncPublisher(brokers),
+	hashedproducer, err = sarama.NewSyncProducer(brokers, config)
+	for err != nil {
+		log.Println("can't create sync producer to ", brokers, "retries in 5 sec")
+		time.Sleep(5 * time.Second)
+		hashedproducer, err = sarama.NewSyncProducer(brokers, config)
 	}
-	go p.listenAsyncProducerErrors()
-	return p
 }
 
 func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.ProducerMessage {
@@ -97,7 +52,6 @@ func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.P
 	case proto.Message:
 		value, err = proto.Marshal(data)
 		if err != nil {
-			log.Printf("kafka error, unable to marshal: %v\n", data)
 			return nil
 		}
 	case []byte:
@@ -117,44 +71,23 @@ func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.P
 	}
 }
 
-func (p *Publisher) PublishAsync(topic string, data interface{}, par int32, key string) {
+func Publish(topic string, data interface{}, keys ...string) {
+	var key string
+	if len(keys) > 0 {
+		key = keys[0]
+	}
+	PublishToPartition(topic, data, -1, key)
+}
+
+func PublishToPartition(topic string, data interface{}, par int32, key string) {
 	msg := prepareMsg(topic, data, par, key)
 	if msg == nil {
 		log.Println("no publish")
 		return
 	}
-	prod := p.asyncproducer
+	prod := producer
 	if par == -1 {
-		prod = p.hashedasyncproducer
-	}
-	prod.Input() <- msg
-}
-
-func (p *Publisher) listenAsyncProducerErrors() {
-	for {
-		select {
-		case <-p.asyncproducer.Successes():
-		case <-p.hashedasyncproducer.Successes():
-		case err := <-p.asyncproducer.Errors():
-			log.Printf("async publish message error: %s\n", err)
-			log.Println(err)
-
-		case err := <-p.hashedasyncproducer.Errors():
-			log.Printf("async publish message error: %s\n", err)
-			log.Println(err)
-		}
-	}
-}
-
-func (p *Publisher) Publish(topic string, data interface{}, par int32, key string) {
-	msg := prepareMsg(topic, data, par, key)
-	if msg == nil {
-		log.Println("no publish")
-		return
-	}
-	prod := p.producer
-	if par == -1 {
-		prod = p.hashedproducer
+		prod = hashedproducer
 	}
 	for {
 		_, _, err := prod.SendMessage(msg)

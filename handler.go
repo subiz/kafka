@@ -4,225 +4,121 @@ import (
 	"context"
 	"log"
 	"os"
-	"strings"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/subiz/executor"
-	cpb "github.com/subiz/header/common"
-	"github.com/subiz/squasher"
+	"github.com/subiz/header"
 )
 
-// Handler is used to consumer kafka messages. Unlike default consumer, it
-// supports routing using sub topic, parallel execution and auto commit.
-type Handler struct {
-	EnableLog bool
+// var hostname string // search-n
+type HandlerFunc func(topic string, partition int32, data []byte)
 
-	// holds address of kafka brokers, eg: ['kafka-0:9092', 'kafka-1:9092']
-	brokers []string
+// Serve listens messages from kafka and call matched handlers
+func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs []string) error {
+	if len(addrs) == 0 {
+		addrs = []string{"kafka-1"}
+	}
+	// hostname, _ = os.Hostname()
 
-	// holds consumer group id
-	consumergroup string
+	if topic == "" {
+		return header.E400(nil, header.E_invalid_account_id, "topic cannot be empty")
+	}
+	config := sarama.NewConfig()
+	config.Version = sarama.V3_3_1_0
+	config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.BalanceStrategyRoundRobin}
+	//  config.Consumer.Return.Errors = true
+	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 
-	// holds kafka topic
-	topic string
+	counter := ratecounter.NewRateCounter(1 * time.Minute)
+	go func() {
+		for {
+			time.Sleep(120 * time.Second)
+			log.Println("KAFKA RATE", topic, counter.Rate())
+		}
+	}()
 
-	// kafka client id, for debugging
-	ClientID string
+	client, err := sarama.NewClient(addrs, config)
+	if err != nil {
+		return err
+	}
 
-	// number of concurrent workers per kafka partition
-	maxworkers uint
+	pars, err := client.Partitions(topic)
+	if err != nil {
+		return err
+	}
+	nPartitions := len(pars)
+	wg := &sync.WaitGroup{}
 
-	// holds a map of function which will be trigger on every kafka messages.
-	// it maps subtopic to a function
-	handlers H
+	cancels := []context.CancelFunc{}
+	for i := 0; i < nPartitions; i++ {
+		wg.Add(1)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancels = append(cancels, cancel)
 
-	// a callback function that will be trigger every time the group is rebalanced
-	rebalanceF func([]int32)
+		con := &consumer{counter: counter, handler: handleFunc}
+		client, err := sarama.NewConsumerGroup(addrs, consumerGroup, config)
+		if err != nil {
+			return err
+		}
 
-	group sarama.ConsumerGroup
+		go func(ctx context.Context, group sarama.ConsumerGroup, con *consumer) {
+			defer wg.Done()
+			for {
+				// `Consume` should be called inside an infinite loop, when a
+				// server-side rebalance happens, the consumer session will need to be
+				// recreated to get the new claims
+				if err := group.Consume(ctx, []string{topic}, con); err != nil {
+					panic(err)
+				}
+				// check if context was cancelled, signaling that the consumer should stop
+				if ctx.Err() != nil {
+					return
+				}
+			}
+		}(ctx, client, con)
+	}
 
-	// commit kafka event automatically when handle returned
-	auto_commit bool
+	sigterm := make(chan os.Signal, 1)
+	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
+	<-sigterm
 
-	sqlock *sync.Mutex // protect sqmap
-	sqmap  map[int32]*squasher.Squasher
+	for _, cancel := range cancels {
+		cancel()
+	}
+	wg.Wait()
+	return client.Close()
+}
 
+// Consumer represents a Sarama consumer group consumer
+type consumer struct {
+	handler HandlerFunc
 	counter *ratecounter.RateCounter
 }
 
-// syntax suggar for define a map of event hander, with the key is the topic
-type H map[string]func(*cpb.Context, []byte)
+// Setup is run at the beginning of a new session, before ConsumeClaim
+func (*consumer) Setup(sarama.ConsumerGroupSession) error { return nil }
 
-// Setup implements sarama.ConsumerGroupHandler.Setup, it is run at the
-// beginning of a new session, before ConsumeClaim.
-func (me *Handler) Setup(session sarama.ConsumerGroupSession) error {
-	if me.rebalanceF != nil {
-		me.rebalanceF(session.Claims()[me.topic])
-	}
-	return nil
-}
+// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited
+func (*consumer) Cleanup(sarama.ConsumerGroupSession) error { return nil }
 
-// Cleanup impements sarama.ConsumerGroupHandler.Cleanup, it is run at the
-// end of a session, once all ConsumeClaim goroutines have exited but
-// before the offsets are committed for the very last time.
-func (me *Handler) Cleanup(_ sarama.ConsumerGroupSession) error {
-	me.sqlock.Lock()
-	me.sqmap = make(map[int32]*squasher.Squasher)
-	me.sqlock.Unlock()
-	if me.rebalanceF != nil {
-		me.rebalanceF(nil)
-	}
-	return nil
-}
-
-// ConsumeClaim implements sarama.ConsumerGroupHandler.ConsumerClaim, it must
-// start a consumer loop of ConsumerGroupClaim's Messages().
-// Once the Messages() channel is closed, the Handler must finish its processing
-// loop and exit.
-func (me *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	par := claim.Partition()
-	var sq *squasher.Squasher
-	ofsc := make(<-chan int64)
-
-	handlers, topic := me.handlers, me.topic
-	exec := executor.New(me.maxworkers, func(key string, p interface{}) {
-		msg := p.(*sarama.ConsumerMessage)
-		val, pctx := msg.Value, &cpb.Context{}
-		var empty cpb.Empty
-		if err := proto.Unmarshal(val, &empty); err == nil {
-			if empty.GetCtx() != nil {
-				pctx = empty.GetCtx()
-			}
-		}
-		subtopic := pctx.GetSubTopic()
-		hf, ok := handlers[subtopic]
-		if !ok && subtopic != "" { // subtopic not found, fallback to default handler
-			hf = handlers[""]
-		}
-		if hf != nil {
-			pctx.KafkaKey, pctx.KafkaOffset, pctx.KafkaPartition = key, msg.Offset, msg.Partition
-			hf(pctx, val)
-		}
-		if me.auto_commit {
-			sq.Mark(msg.Offset)
-		}
-	})
-
-	defer func() {
-		exec.Wait()
-		exec.Stop() // clean up resource
-	}()
-
-	firstmessage := true
-	t := time.NewTicker(1 * time.Second) // used to check slow consumer
+// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
+func (me *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for {
 		select {
-		case o := <-ofsc:
-			// o+1 because we want consumer offset to point to the next message
-			session.MarkOffset(topic, par, o+1, "")
-		case <-t.C:
-			if sq == nil {
-				continue
-			}
-
-			ss := strings.Split(sq.GetStatus(), " .. ")
-			if len(ss) == 3 && len(ss[0]) > 2 && len(ss[2]) > 2 {
-				a, b, c := ss[0][1:], ss[1], ss[2][:len(ss[2])-1]
-				if a != b || b != c {
-					log.Println("Handle status ", par, sq.GetStatus())
-				}
-			}
-		case msg, more := <-claim.Messages():
-			if !more {
-				log.Println("KAFKA FORCE EXIT AT PARTITION", claim.Partition())
-				return nil
-			}
-
+		case message := <-claim.Messages():
+			// log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
 			me.counter.Incr(1)
-
-			if firstmessage {
-				firstmessage = false
-				log.Println("Kafka Info #852459 start comsume partition", par, "of topic",
-					claim.Topic(), "at", msg.Offset)
-				sq = squasher.NewSquasher(msg.Offset, int32(me.maxworkers*100000)) // 800k item each worker
-				ofsc = sq.Next()
-				me.sqlock.Lock()
-				me.sqmap[par] = sq
-				me.sqlock.Unlock()
-			}
-			exec.Add(string(msg.Key), msg)
+			me.handler(message.Topic, message.Partition, message.Value)
+			session.MarkMessage(message, "")
+		// Should return when `session.Context()` is done.
+		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
+		// https://github.com/Shopify/sarama/issues/1192
+		case <-session.Context().Done():
+			return nil
 		}
 	}
-}
-
-// NewHandler creates a new Handler object
-func NewHandler(brokers []string, consumergroup, topic string, autocommit bool) *Handler {
-	hostname, _ := os.Hostname()
-	return &Handler{
-		brokers:       brokers,
-		consumergroup: consumergroup,
-		maxworkers:    5,
-		topic:         topic,
-		ClientID:      hostname,
-		sqlock:        &sync.Mutex{},
-		sqmap:         make(map[int32]*squasher.Squasher, 0),
-		auto_commit:   autocommit,
-	}
-}
-
-// Serve listens messages from kafka and call matched handlers
-func (me *Handler) Serve(handlers H, rebalanceF func([]int32)) {
-	c := sarama.NewConfig()
-	c.Version = sarama.V2_1_0_0
-	c.ClientID = me.ClientID
-	c.Consumer.Return.Errors = true
-	c.Consumer.Offsets.Initial = sarama.OffsetOldest
-	var err error
-	me.group, err = sarama.NewConsumerGroup(me.brokers, me.consumergroup, c)
-	if err != nil {
-		panic(err)
-	}
-
-	me.counter = ratecounter.NewRateCounter(1 * time.Second)
-
-	me.handlers, me.rebalanceF = handlers, rebalanceF
-	go func() {
-		for err := range me.group.Errors() {
-			log.Printf("Kafka err #24525294: %s\n", err.Error())
-		}
-	}()
-
-	if me.EnableLog {
-		go func() {
-			for {
-				log.Println("KAFKA RATE", me.topic, me.counter.Rate())
-				time.Sleep(4 * time.Second)
-			}
-		}()
-	}
-
-	for {
-		err = me.group.Consume(context.Background(), []string{me.topic}, me)
-		if err != nil {
-			log.Printf("Kafka err #222293: %s\nRetry in 2 secs\n", err.Error())
-			time.Sleep(2 * time.Second)
-		}
-	}
-}
-
-// Close stops the handler and detaches any running sessions
-func (me *Handler) Close() error { return me.group.Close() }
-
-// Commit marks kafka event as processed so it won't restream next time server
-// is started
-func (me *Handler) Commit(partition int32, offset int64) {
-	me.sqlock.Lock()
-	if sq := me.sqmap[partition]; sq != nil {
-		sq.Mark(offset)
-	}
-	me.sqlock.Unlock()
 }
