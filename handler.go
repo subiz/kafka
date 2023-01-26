@@ -15,15 +15,16 @@ import (
 )
 
 // var hostname string // search-n
-type HandlerFunc func(topic string, partition int32, data []byte)
+type HandlerFunc func(topic string, partition int32, offset int64, data []byte)
+
+var g_consumer_group_session_lock = &sync.Mutex{}
+var g_consumer_group_session = map[string]sarama.ConsumerGroupSession{}
 
 // Serve listens messages from kafka and call matched handlers
 func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
 	if len(addrs) == 0 {
 		addrs = g_brokers
 	}
-	// hostname, _ = os.Hostname()
-
 	if topic == "" {
 		return header.E400(nil, header.E_invalid_account_id, "topic cannot be empty")
 	}
@@ -41,66 +42,65 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 		}
 	}()
 
-	client, err := sarama.NewClient(addrs, config)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	con := newConsumer(consumerGroup, topic, handleFunc, counter)
+	client, err := sarama.NewConsumerGroup(addrs, consumerGroup, config)
 	if err != nil {
 		return err
 	}
-
-	pars, err := client.Partitions(topic)
-	if err != nil {
-		return err
-	}
-	nPartitions := len(pars)
-	wg := &sync.WaitGroup{}
-
-	cancels := []context.CancelFunc{}
-	for i := 0; i < nPartitions; i++ {
-		wg.Add(1)
-		ctx, cancel := context.WithCancel(context.Background())
-		cancels = append(cancels, cancel)
-
-		con := &consumer{counter: counter, handler: handleFunc}
-		client, err := sarama.NewConsumerGroup(addrs, consumerGroup, config)
-		if err != nil {
-			return err
-		}
-
-		go func(ctx context.Context, group sarama.ConsumerGroup, con *consumer) {
-			defer wg.Done()
-			for {
-				// `Consume` should be called inside an infinite loop, when a
-				// server-side rebalance happens, the consumer session will need to be
-				// recreated to get the new claims
-				if err := group.Consume(ctx, []string{topic}, con); err != nil {
-					panic(err)
-				}
-				// check if context was cancelled, signaling that the consumer should stop
-				if ctx.Err() != nil {
-					return
-				}
+	go func() {
+		for {
+			// `Consume` should be called inside an infinite loop, when a
+			// server-side rebalance happens, the consumer session will need to be
+			// recreated to get the new claims
+			if err := client.Consume(ctx, []string{topic}, con); err != nil {
+				panic(err)
 			}
-		}(ctx, client, con)
-	}
+			// check if context was cancelled, signaling that the consumer should stop
+			if ctx.Err() != nil {
+				return
+			}
+		}
+	}()
 
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 	<-sigterm
-
-	for _, cancel := range cancels {
-		cancel()
-	}
-	wg.Wait()
+	cancel()
 	return client.Close()
+}
+
+// offset + 1
+func MarkOffset(consumerGroup, topic string, partition int32, offset int64) {
+	g_consumer_group_session_lock.Lock()
+	defer g_consumer_group_session_lock.Unlock()
+	session := g_consumer_group_session[consumerGroup+","+topic]
+	if session == nil {
+		return
+	}
+	session.MarkOffset(topic, partition, offset, "")
 }
 
 // Consumer represents a Sarama consumer group consumer
 type consumer struct {
-	handler HandlerFunc
-	counter *ratecounter.RateCounter
+	topic         string
+	consumerGroup string
+	handler       HandlerFunc
+	counter       *ratecounter.RateCounter
+}
+
+func newConsumer(consumerGroup, topic string, handler HandlerFunc, counter *ratecounter.RateCounter) *consumer {
+	return &consumer{topic: topic, consumerGroup: consumerGroup, handler: handler, counter: counter}
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
-func (*consumer) Setup(sarama.ConsumerGroupSession) error { return nil }
+func (me *consumer) Setup(session sarama.ConsumerGroupSession) error {
+	g_consumer_group_session_lock.Lock()
+	g_consumer_group_session[me.consumerGroup+","+me.topic] = session
+	g_consumer_group_session_lock.Unlock()
+	return nil
+}
 
 // Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited
 func (*consumer) Cleanup(sarama.ConsumerGroupSession) error { return nil }
@@ -110,10 +110,8 @@ func (me *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sara
 	for {
 		select {
 		case message := <-claim.Messages():
-			// log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
 			me.counter.Incr(1)
-			me.handler(message.Topic, message.Partition, message.Value)
-			session.MarkMessage(message, "")
+			me.handler(message.Topic, message.Partition, message.Offset, message.Value)
 		// Should return when `session.Context()` is done.
 		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
 		// https://github.com/Shopify/sarama/issues/1192

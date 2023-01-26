@@ -37,6 +37,7 @@ func prepareProducer() {
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 
+	brokers := g_brokers
 	producer, err = sarama.NewSyncProducer(brokers, config)
 	for err != nil {
 		log.Println("can't create sync producer to ", brokers, "retries in 5 sec", err)
