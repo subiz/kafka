@@ -23,7 +23,8 @@ KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
 Format Log Directories
 
 ```sh
-$ /opt/kafka/bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c config/kraft/server.properties
+$ KAFKA_CLUSTER_ID=Pyi9Id7fRSWlmId_KU07LQ
+$ /opt/kafka/bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c /opt/kafka/config/kraft/server.properties
 ```
 Start the Kafka Server
 `
@@ -37,7 +38,12 @@ Change `broker.id=0` to `broker.id=1`
 Change `num.partitions=1` to `num.partitions=50`
 Add `listeners=PLAINTEXT://kafka-1:9092`
 Add `advertised.listeners=PLAINTEXT://kafka-1:9092`
-Also, change the listeners key in `/opt/kafka/config/kraft/broker.properties` and `/opt/kafka/config/kraft/server.properties`
+
+Also, change the listeners key  `/opt/kafka/config/kraft/server.properties`
+
+`advertised.listeners=PLAINTEXT://kafka-1:9092`
+`log.dirs=/var/log/kraft-combined-logs`
+`num.partitions=50`
 
 ### Create service
 ```sh
@@ -90,4 +96,34 @@ This is my second event
 #### Read event
 ```sh
 $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
+```
+
+### List topics
+```sh
+/opt/kafka/bin/kafka-topics.sh --create --topic search-index-0 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic search-index-1 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic search-index-2 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic search-index-3 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-0 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-1 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-2 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-3 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-4 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-5 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-6 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-7 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-8 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic lead-index-9 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+```
+
+#### List all consumer group
+```sh
+$ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
+```
+
+#### Describe consumber group
+```sh
+$ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group search-1
 ```
