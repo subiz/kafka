@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/thanhpk/randstr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -95,6 +96,9 @@ func Publish(topic string, data interface{}, keys ...string) {
 	var key string
 	if len(keys) > 0 {
 		key = keys[0]
+	} else {
+		// random
+		key = randstr.String(10)
 	}
 	PublishToPartition(topic, data, -1, key)
 }
