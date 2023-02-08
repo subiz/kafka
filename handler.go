@@ -109,7 +109,13 @@ func (*consumer) Cleanup(sarama.ConsumerGroupSession) error { return nil }
 func (me *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for {
 		select {
-		case message := <-claim.Messages():
+		case message, more := <-claim.Messages():
+			if !more {
+				return nil
+			}
+			if message == nil {
+				break
+			}
 			me.counter.Incr(1)
 			me.handler(message.Topic, message.Partition, message.Offset, message.Value)
 		// Should return when `session.Context()` is done.
