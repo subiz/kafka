@@ -55,7 +55,9 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
 			if err := client.Consume(ctx, []string{topic}, con); err != nil {
-				panic(err)
+				log.Println("KAFKA ERR", topic, consumerGroup, err)
+				time.Sleep(1 * time.Second)
+				continue
 			}
 			// check if context was cancelled, signaling that the consumer should stop
 			if ctx.Err() != nil {
