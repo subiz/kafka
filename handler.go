@@ -43,10 +43,10 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	con := newConsumer(consumerGroup, topic, handleFunc, counter)
 	client, err := sarama.NewConsumerGroup(addrs, consumerGroup, config)
 	if err != nil {
+		cancel()
 		return err
 	}
 	go func() {
