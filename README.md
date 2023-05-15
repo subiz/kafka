@@ -127,6 +127,20 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic user-index-7 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic user-index-8 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic user-index-9 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-0 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-1 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-2 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-3 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-4 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-5 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-6 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-7 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-8 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic user-updated-9 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic credit-spend --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 ```
 
 #### List all consumer group

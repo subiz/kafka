@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,11 +10,12 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/paulbellamy/ratecounter"
-	"github.com/subiz/header"
+	"github.com/subiz/log"
 )
 
 // var hostname string // search-n
 type HandlerFunc func(topic string, partition int32, offset int64, data []byte)
+type PartitionHandlerFunc func(offset int64, data []byte)
 
 var g_consumer_group_session_lock = &sync.Mutex{}
 var g_consumer_group_session = map[string]sarama.ConsumerGroupSession{}
@@ -26,7 +26,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 		addrs = g_brokers
 	}
 	if topic == "" {
-		return header.E400(nil, header.E_invalid_account_id, "topic cannot be empty")
+		return log.EServer(nil, log.M{"message": "topic cannot be empty"})
 	}
 	config := sarama.NewConfig()
 	config.Version = sarama.V3_3_1_0
@@ -38,7 +38,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 	go func() {
 		for {
 			time.Sleep(120 * time.Second)
-			log.Println("KAFKA RATE", topic, counter.Rate())
+			log.Info("subiz", "KAFKA RATE", topic, counter.Rate())
 		}
 	}()
 
@@ -55,7 +55,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
 			if err := client.Consume(ctx, []string{topic}, con); err != nil {
-				log.Println("KAFKA ERR", topic, consumerGroup, err)
+				log.Err("subiz", err, "KAFKA ERR", topic, consumerGroup)
 				time.Sleep(10 * time.Second)
 				continue
 			}
