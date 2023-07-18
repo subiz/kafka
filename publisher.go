@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/thanhpk/randstr"
 	"google.golang.org/protobuf/proto"
 )

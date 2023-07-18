@@ -100,6 +100,9 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 
 ### List topics
 ```sh
+/opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka-1:9092
+
+
 /opt/kafka/bin/kafka-topics.sh --create --topic search-index-0 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic search-index-1 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic search-index-2 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -140,7 +143,31 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic user-updated-8 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic user-updated-9 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
 
-/opt/kafka/bin/kafka-topics.sh --create --topic credit-spend --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic test --partitions 2 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic credit-spend-log --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-0 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-1 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-2 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-3 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-4 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-5 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-6 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-convo-7 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-0 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-1 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-2 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-3 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+scheduler-
 ```
 
 #### List all consumer group

@@ -3,11 +3,11 @@ module github.com/subiz/kafka
 go 1.20
 
 require (
-	github.com/Shopify/sarama v1.38.1
+	github.com/IBM/sarama v1.40.0
 	github.com/paulbellamy/ratecounter v0.2.0
-	github.com/subiz/log v0.0.24
-	github.com/thanhpk/randstr v1.0.5
-	google.golang.org/protobuf v1.30.0
+	github.com/subiz/log v0.0.34
+	github.com/thanhpk/randstr v1.0.6
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -25,9 +25,9 @@ require (
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	github.com/klauspost/compress v1.16.5 // indirect
-	github.com/pierrec/lz4/v4 v4.1.17 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
+	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/crypto v0.11.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
 )
