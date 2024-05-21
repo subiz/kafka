@@ -167,6 +167,15 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-2 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic scheduler-task-3 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-0 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-1 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-2 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-3 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-4 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-5 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-6 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-7 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+
 scheduler-
 ```
 
