@@ -20,6 +20,7 @@ type PartitionHandlerFunc func(offset int64, data []byte)
 var g_consumer_group_session_lock = &sync.Mutex{}
 var g_consumer_group_session = map[string]sarama.ConsumerGroupSession{}
 
+// deprecated, use Listen2
 // Serve listens messages from kafka and call matched handlers
 func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
 	if len(addrs) == 0 {
@@ -30,7 +31,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 	}
 	config := sarama.NewConfig()
 	config.Version = sarama.V3_3_1_0
-	config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.BalanceStrategyRoundRobin}
+	config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRoundRobin()}
 	//  config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 
@@ -71,6 +72,32 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 	<-sigterm
 	cancel()
 	return client.Close()
+}
+
+// Listen2 likes Listen but auto commit
+func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
+	lock := sync.Mutex{}
+	var latestConsumeOffset = map[int32]int64{}
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			lock.Lock()
+			for partition, offset := range latestConsumeOffset {
+				MarkOffset(consumerGroup, topic, partition, offset+1)
+			}
+			latestConsumeOffset = map[int32]int64{}
+			lock.Unlock()
+		}
+	}()
+	myFunc := func(topic string, partition int32, offset int64, data []byte) {
+		handleFunc(topic, partition, offset, data)
+		lock.Lock()
+		latestConsumeOffset[partition] = offset
+		lock.Unlock()
+
+	}
+	return Listen(consumerGroup, topic, myFunc, addrs...)
 }
 
 // offset + 1
