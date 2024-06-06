@@ -27,7 +27,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 		addrs = g_brokers
 	}
 	if topic == "" {
-		return log.EServer(nil, log.M{"message": "topic cannot be empty"})
+		return log.EServer(nil, false, log.M{"message": "topic cannot be empty"})
 	}
 	config := sarama.NewConfig()
 	config.Version = sarama.V3_3_1_0
