@@ -14,7 +14,7 @@ import (
 )
 
 // var hostname string // search-n
-type HandlerFunc func(topic string, partition int32, offset int64, data []byte)
+type HandlerFunc func(partition int32, offset int64, data []byte)
 type PartitionHandlerFunc func(offset int64, data []byte)
 
 var g_consumer_group_session_lock = &sync.Mutex{}
@@ -81,7 +81,7 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...strin
 
 	go func() {
 		for {
-			time.Sleep(10 * time.Minute)
+			time.Sleep(1 * time.Minute)
 			lock.Lock()
 			for partition, offset := range latestConsumeOffset {
 				MarkOffset(consumerGroup, topic, partition, offset+1)
@@ -90,12 +90,11 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...strin
 			lock.Unlock()
 		}
 	}()
-	myFunc := func(topic string, partition int32, offset int64, data []byte) {
-		handleFunc(topic, partition, offset, data)
+	myFunc := func(partition int32, offset int64, data []byte) {
+		handleFunc(partition, offset, data)
 		lock.Lock()
 		latestConsumeOffset[partition] = offset
 		lock.Unlock()
-
 	}
 	return Listen(consumerGroup, topic, myFunc, addrs...)
 }
@@ -146,7 +145,7 @@ func (me *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sara
 				break
 			}
 			me.counter.Incr(1)
-			me.handler(message.Topic, message.Partition, message.Offset, message.Value)
+			me.handler(message.Partition, message.Offset, message.Value)
 		// Should return when `session.Context()` is done.
 		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
 		// https://github.com/Shopify/sarama/issues/1192
