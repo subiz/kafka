@@ -14,7 +14,7 @@ import (
 )
 
 // var hostname string // search-n
-type HandlerFunc func(partition int32, offset int64, data []byte)
+type HandlerFunc func(partition int32, offset int64, data []byte, key string)
 type PartitionHandlerFunc func(offset int64, data []byte)
 
 var g_consumer_group_session_lock = &sync.Mutex{}
@@ -90,8 +90,8 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...strin
 			lock.Unlock()
 		}
 	}()
-	myFunc := func(partition int32, offset int64, data []byte) {
-		handleFunc(partition, offset, data)
+	myFunc := func(partition int32, offset int64, data []byte, key string) {
+		handleFunc(partition, offset, data, key)
 		lock.Lock()
 		latestConsumeOffset[partition] = offset
 		lock.Unlock()
@@ -145,7 +145,7 @@ func (me *consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sara
 				break
 			}
 			me.counter.Incr(1)
-			me.handler(message.Partition, message.Offset, message.Value)
+			me.handler(message.Partition, message.Offset, message.Value, string(message.Key))
 		// Should return when `session.Context()` is done.
 		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
 		// https://github.com/Shopify/sarama/issues/1192
