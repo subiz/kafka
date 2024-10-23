@@ -273,3 +273,14 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-5 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-6 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-7 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic integration-updated --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic counter --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+# /opt/kafka/bin/kafka-topics.sh --delete --topic counter --bootstrap-server kafka-1:9092
+
+/opt/kafka/bin/kafka-topics.sh --create --topic counter-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic counter-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic counter-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic counter-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
