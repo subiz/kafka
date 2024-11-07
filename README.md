@@ -240,6 +240,10 @@ scheduler-
 /opt/kafka/bin/kafka-topics.sh --create --topic facebook-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic facebook-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 ```
 
 #### List all consumer group
