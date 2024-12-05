@@ -288,3 +288,33 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --create --topic counter-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic counter-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic counter-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+
+
+
+
+
+
+
+
+
+
+### Create topics in kafkaatm
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-0 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-1 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-2 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-3 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-4 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-5 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-6 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-7 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafkaatm:9092
+
+
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-0 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-1 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-2 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-3 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-4 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-5 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-6 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-7 --alter --add-config retention.ms=86400000

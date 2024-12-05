@@ -3,62 +3,66 @@ package kafka
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
-	"github.com/thanhpk/randstr"
 	"google.golang.org/protobuf/proto"
 )
 
-var producer sarama.SyncProducer
-var hashedproducer sarama.SyncProducer
-var started bool
+var producerM = map[string]sarama.SyncProducer{}
+var hashedproducerM = map[string]sarama.SyncProducer{}
+
 var lock = &sync.Mutex{}
-var g_brokers = []string{"kafka-1:9092"}
 
-func SetBrokers(brokers []string) {
-	g_brokers = brokers
-}
+func prepareProducer(broker string, par int) sarama.SyncProducer {
+	var prod sarama.SyncProducer
+	if par == -1 {
+		prod = hashedproducerM[broker]
+	} else {
+		prod = producerM[broker]
+	}
 
-func prepareProducer() {
-	if started {
-		return
+	if prod != nil {
+		return prod
 	}
 
 	lock.Lock()
-	if started {
-		lock.Unlock()
-		return
-	}
+	defer lock.Unlock()
 
-	var err error
 	config := sarama.NewConfig()
-	config.Producer.Partitioner = sarama.NewManualPartitioner
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 
-	brokers := g_brokers
-	producer, err = sarama.NewSyncProducer(brokers, config)
-	for err != nil {
-		log.Println("can't create sync producer to ", brokers, "retries in 5 sec", err)
-		time.Sleep(5 * time.Second)
-		producer, err = sarama.NewSyncProducer(brokers, config)
+	var pM map[string]sarama.SyncProducer
+	if par == -1 {
+		config.Producer.Partitioner = sarama.NewHashPartitioner
+		pM = hashedproducerM
+	} else {
+		config.Producer.Partitioner = sarama.NewManualPartitioner
+		pM = producerM
 	}
 
-	config = sarama.NewConfig()
-	config.Producer.Partitioner = sarama.NewHashPartitioner
-	config.Producer.Return.Successes = true
-	config.Producer.Return.Errors = true
-
-	hashedproducer, err = sarama.NewSyncProducer(brokers, config)
+	producer, err := sarama.NewSyncProducer([]string{broker}, config)
 	for err != nil {
-		log.Println("can't create sync producer to ", brokers, "retries in 5 sec", err)
+		log.Println("can't create sync producer to ", broker, "retries in 5 sec", err)
 		time.Sleep(5 * time.Second)
-		hashedproducer, err = sarama.NewSyncProducer(brokers, config)
+		producer, err = sarama.NewSyncProducer([]string{broker}, config)
 	}
-	started = true
-	lock.Unlock()
+
+	newpM := map[string]sarama.SyncProducer{}
+	for k, v := range pM {
+		newpM[k] = v
+	}
+	newpM[broker] = producer
+
+	if par == -1 {
+		hashedproducerM = newpM
+	} else {
+		producerM = newpM
+	}
+	return producer
 }
 
 func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.ProducerMessage {
@@ -92,28 +96,23 @@ func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.P
 	}
 }
 
-func Publish(topic string, data interface{}, keys ...string) {
+func Publish(broker string, topic string, data interface{}, keys ...string) {
 	var key string
 	if len(keys) > 0 {
 		key = keys[0]
 	} else {
 		// random
-		key = randstr.String(10)
+		key = strconv.Itoa(int(time.Now().UnixNano()))
 	}
-	PublishToPartition(topic, data, -1, key)
+	PublishToPartition(broker, topic, data, -1, key)
 }
 
-func PublishToPartition(topic string, data interface{}, par int32, key string) {
-	prepareProducer()
-
+func PublishToPartition(broker, topic string, data interface{}, par int32, key string) {
+	prod := prepareProducer(broker, int(par))
 	msg := prepareMsg(topic, data, par, key)
 	if msg == nil {
 		log.Println("no publish")
 		return
-	}
-	prod := producer
-	if par == -1 {
-		prod = hashedproducer
 	}
 	for {
 		_, _, err := prod.SendMessage(msg)
