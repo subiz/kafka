@@ -22,10 +22,7 @@ var g_consumer_group_session = map[string]sarama.ConsumerGroupSession{}
 
 // deprecated, use Listen2
 // Serve listens messages from kafka and call matched handlers
-func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
-	if len(addrs) == 0 {
-		addrs = g_brokers
-	}
+func Listen(consumerGroup, topic string, handleFunc HandlerFunc, broker string) error {
 	if topic == "" {
 		return log.ERetry(nil, log.M{"message": "topic cannot be empty"})
 	}
@@ -45,7 +42,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 
 	ctx, cancel := context.WithCancel(context.Background())
 	con := newConsumer(consumerGroup, topic, handleFunc, counter)
-	client, err := sarama.NewConsumerGroup(addrs, consumerGroup, config)
+	client, err := sarama.NewConsumerGroup([]string{broker}, consumerGroup, config)
 	if err != nil {
 		cancel()
 		return err
@@ -75,7 +72,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string
 }
 
 // Listen2 likes Listen but auto commit
-func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...string) error {
+func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addr string) error {
 	lock := sync.Mutex{}
 	var latestConsumeOffset = map[int32]int64{}
 
@@ -96,7 +93,7 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addrs ...strin
 		latestConsumeOffset[partition] = offset
 		lock.Unlock()
 	}
-	return Listen(consumerGroup, topic, myFunc, addrs...)
+	return Listen(consumerGroup, topic, myFunc, addr)
 }
 
 // offset + 1
