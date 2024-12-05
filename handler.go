@@ -22,7 +22,7 @@ var g_consumer_group_session = map[string]sarama.ConsumerGroupSession{}
 
 // deprecated, use Listen2
 // Serve listens messages from kafka and call matched handlers
-func Listen(consumerGroup, topic string, handleFunc HandlerFunc, broker string) error {
+func Listen(broker, consumerGroup, topic string, handleFunc HandlerFunc) error {
 	if topic == "" {
 		return log.ERetry(nil, log.M{"message": "topic cannot be empty"})
 	}
@@ -41,7 +41,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, broker string) 
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	con := newConsumer(consumerGroup, topic, handleFunc, counter)
+	con := newConsumer(broker, consumerGroup, topic, handleFunc, counter)
 	client, err := sarama.NewConsumerGroup([]string{broker}, consumerGroup, config)
 	if err != nil {
 		cancel()
@@ -72,7 +72,7 @@ func Listen(consumerGroup, topic string, handleFunc HandlerFunc, broker string) 
 }
 
 // Listen2 likes Listen but auto commit
-func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addr string) error {
+func Listen2(addr, consumerGroup, topic string, handleFunc HandlerFunc) error {
 	lock := sync.Mutex{}
 	var latestConsumeOffset = map[int32]int64{}
 
@@ -81,7 +81,7 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addr string) e
 			time.Sleep(1 * time.Minute)
 			lock.Lock()
 			for partition, offset := range latestConsumeOffset {
-				MarkOffset(consumerGroup, topic, partition, offset+1)
+				MarkOffset(addr, consumerGroup, topic, partition, offset+1)
 			}
 			latestConsumeOffset = map[int32]int64{}
 			lock.Unlock()
@@ -93,14 +93,14 @@ func Listen2(consumerGroup, topic string, handleFunc HandlerFunc, addr string) e
 		latestConsumeOffset[partition] = offset
 		lock.Unlock()
 	}
-	return Listen(consumerGroup, topic, myFunc, addr)
+	return Listen(addr, consumerGroup, topic, myFunc)
 }
 
 // offset + 1
-func MarkOffset(consumerGroup, topic string, partition int32, offset int64) {
+func MarkOffset(broker, consumerGroup, topic string, partition int32, offset int64) {
 	g_consumer_group_session_lock.Lock()
 	defer g_consumer_group_session_lock.Unlock()
-	session := g_consumer_group_session[consumerGroup+","+topic]
+	session := g_consumer_group_session[broker+","+consumerGroup+","+topic]
 	if session == nil {
 		return
 	}
@@ -109,20 +109,21 @@ func MarkOffset(consumerGroup, topic string, partition int32, offset int64) {
 
 // Consumer represents a Sarama consumer group consumer
 type consumer struct {
+	broker        string
 	topic         string
 	consumerGroup string
 	handler       HandlerFunc
 	counter       *ratecounter.RateCounter
 }
 
-func newConsumer(consumerGroup, topic string, handler HandlerFunc, counter *ratecounter.RateCounter) *consumer {
-	return &consumer{topic: topic, consumerGroup: consumerGroup, handler: handler, counter: counter}
+func newConsumer(broker, consumerGroup, topic string, handler HandlerFunc, counter *ratecounter.RateCounter) *consumer {
+	return &consumer{broker: broker, topic: topic, consumerGroup: consumerGroup, handler: handler, counter: counter}
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
 func (me *consumer) Setup(session sarama.ConsumerGroupSession) error {
 	g_consumer_group_session_lock.Lock()
-	g_consumer_group_session[me.consumerGroup+","+me.topic] = session
+	g_consumer_group_session[me.broker+","+me.consumerGroup+","+me.topic] = session
 	g_consumer_group_session_lock.Unlock()
 	return nil
 }
