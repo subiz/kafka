@@ -114,7 +114,7 @@ func PublishToPartition(broker, topic string, data interface{}, par int32, key s
 		log.Println("no publish")
 		return
 	}
-	for {
+	for i = 0; i < 10; i++ {
 		_, _, err := prod.SendMessage(msg)
 		if err == nil {
 			break
