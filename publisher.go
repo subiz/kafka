@@ -34,7 +34,8 @@ func prepareProducer(broker string, par int) sarama.SyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
-
+	config.Producer.MaxMessageBytes = 10 * 1024
+	config.Producer.Retry.Max = 10
 	var pM map[string]sarama.SyncProducer
 	if par == -1 {
 		config.Producer.Partitioner = sarama.NewHashPartitioner
@@ -114,7 +115,7 @@ func PublishToPartition(broker, topic string, data interface{}, par int32, key s
 		log.Println("no publish")
 		return
 	}
-	for i = 0; i < 10; i++ {
+	for i := 0; i < 10; i++ {
 		_, _, err := prod.SendMessage(msg)
 		if err == nil {
 			break
