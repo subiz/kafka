@@ -34,7 +34,7 @@ func prepareProducer(broker string, par int) sarama.SyncProducer {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
-	config.Producer.MaxMessageBytes = 10 * 1024
+	config.Producer.MaxMessageBytes = 10 * 1024 * 1024
 	config.Producer.Retry.Max = 10
 	var pM map[string]sarama.SyncProducer
 	if par == -1 {

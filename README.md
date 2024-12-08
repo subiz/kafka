@@ -176,6 +176,7 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-5 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-6 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-7 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-updated-8 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 
 /opt/kafka/bin/kafka-topics.sh --create --topic integration-sync-facebook-0 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic integration-sync-facebook-1 --partitions 1 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -191,7 +192,7 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic ticket-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
-
+/opt/kafka/bin/kafka-topics.sh --create --topic ticket-4 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
 /opt/kafka/bin/kafka-topics.sh --create --topic convo-event-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic convo-event-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -201,7 +202,7 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic convo-event-5 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic convo-event-6 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic convo-event-7 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
-
+/opt/kafka/bin/kafka-topics.sh --create --topic convo-event-8 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
 /opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-0 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-1 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -211,7 +212,7 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 /opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-5 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-6 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-7 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
-
+/opt/kafka/bin/kafka-topics.sh --create --topic send-convo-event-8 --partitions 10 --replication-factor 1 --bootstrap-server kafka-1:9092
 scheduler-
 
 /opt/kafka/bin/kafka-topics.sh --create --topic user-event-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -231,6 +232,7 @@ scheduler-
 /opt/kafka/bin/kafka-topics.sh --create --topic webhook-event-5 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic webhook-event-6 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic webhook-event-7 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic webhook-event-8 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
 /opt/kafka/bin/kafka-configs.sh --describe --topic webhook-event-7 --all --bootstrap-server kafka-1:9092
 
@@ -240,9 +242,9 @@ scheduler-
 /opt/kafka/bin/kafka-topics.sh --create --topic facebook-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic facebook-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
-/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
-/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
-/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092 
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic metric-count-log-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 ```
 
@@ -307,6 +309,7 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-5 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-6 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-7 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-8 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
 /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafkaatm:9092
 
 
@@ -318,3 +321,4 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-5 --alter --add-config retention.ms=86400000
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-6 --alter --add-config retention.ms=86400000
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-7 --alter --add-config retention.ms=86400000
+/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-8 --alter --add-config retention.ms=86400000
