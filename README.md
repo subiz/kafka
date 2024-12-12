@@ -260,9 +260,8 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 
 /opt/kafka/bin/kafka-topics.sh --describe --topic send-convo-event-0 --bootstrap-server localhost:9092
 
-/opt/kafka/bin/kafka-topics.sh --create --topic noti5-event --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
-
-
+/opt/kafka/bin/kafka-topics.sh --create --topic noti5-event-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic noti5-event-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
