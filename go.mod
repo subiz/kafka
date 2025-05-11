@@ -8,10 +8,11 @@ require (
 	github.com/IBM/sarama v1.45.1
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/subiz/executor/v2 v2.0.5
-	github.com/subiz/header v1.23.81
+	github.com/subiz/header v1.23.83
 	github.com/subiz/log v1.0.6
 	github.com/subiz/squasher v1.0.0
-	github.com/subiz/squasher/v2 v2.0.4
+	github.com/subiz/squasher/v2 v2.0.5
+	google.golang.org/grpc v1.72.0
 	google.golang.org/protobuf v1.36.6
 )
 
@@ -68,6 +69,5 @@ require (
 	golang.org/x/text v0.25.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250505200425-f936aa4a68b2 // indirect
-	google.golang.org/grpc v1.72.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 )

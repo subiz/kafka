@@ -110,6 +110,10 @@ github.com/subiz/executor/v2 v2.0.5 h1:81KaEj/ThQRgvKLRJ/uZ55rzDf8IGRnhr2TgFl5vB
 github.com/subiz/executor/v2 v2.0.5/go.mod h1:gPEh4r4khVbxzcu6oO/C7eVwxbgbah3An725TH8M8HQ=
 github.com/subiz/header v1.23.81 h1:Si3KbiTJeg2Sfsjl8odFsNDLX2Zyw/qaqBJP8Vyfo/Y=
 github.com/subiz/header v1.23.81/go.mod h1:NJdQpNosDJawMKzaXkihTJ0MOJTlXDUiZiK+rcDjXPw=
+github.com/subiz/header v1.23.82 h1:fsZ/DXM4f5OeRFEE8XRCJJupTzeAediFMto6Jo0HS5U=
+github.com/subiz/header v1.23.82/go.mod h1:NJdQpNosDJawMKzaXkihTJ0MOJTlXDUiZiK+rcDjXPw=
+github.com/subiz/header v1.23.83 h1:NQwbK2Fqug7WrV3NLifbm/Ng3TkH+YghYGaDI+G99ZA=
+github.com/subiz/header v1.23.83/go.mod h1:NJdQpNosDJawMKzaXkihTJ0MOJTlXDUiZiK+rcDjXPw=
 github.com/subiz/log v0.0.77 h1:0m0RH/K/I1Cos8QrakcutD+NzaEAd3hK3NHU/2Y5JvQ=
 github.com/subiz/log v0.0.77/go.mod h1:/lq9VEIKzCx8BiH9hr6IwBnqSRiBneTtyFgnLBAzXFc=
 github.com/subiz/log v1.0.6 h1:HvGzYiuXWF3QklcOXTvQiuuRzm9L51KFKml5ULX5ogo=
@@ -120,6 +124,8 @@ github.com/subiz/squasher/v2 v2.0.3 h1:BcPcRJ1Yx0zv9o0ER3Ip3P/vhAQCTwt1Qc3O4hZmq
 github.com/subiz/squasher/v2 v2.0.3/go.mod h1:kP/qhQi3Lqs2rIdXCdsp646kQbzL90hY4XUR0bm+1wU=
 github.com/subiz/squasher/v2 v2.0.4 h1:zhLwDb/WWUQh5phrurTy4fNLT0+At66ZK/Sfc1Q2X2M=
 github.com/subiz/squasher/v2 v2.0.4/go.mod h1:kP/qhQi3Lqs2rIdXCdsp646kQbzL90hY4XUR0bm+1wU=
+github.com/subiz/squasher/v2 v2.0.5 h1:T5l1mvJTAqhd+GCITOBU7+AkwfbMjURn2mU6fea5I8E=
+github.com/subiz/squasher/v2 v2.0.5/go.mod h1:kP/qhQi3Lqs2rIdXCdsp646kQbzL90hY4XUR0bm+1wU=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=

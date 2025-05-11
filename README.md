@@ -101,6 +101,16 @@ $ /opt/kafka/bin/kafka-console-consumer.sh --topic quickstart-events --from-begi
 ### List topics
 ```sh
 /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka-1:9092
+```
+#### Inside docker
+List all topics
+```sh
+docker exec kafka /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+```
+Delete topic prefixed with "test"
+```sh
+docker exec -w /opt/kafka/bin -it kafka bash -c "for topic in \$(./kafka-topics.sh --bootstrap-server localhost:9092 --list | grep '^test'); do ./kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic \$topic; done"
+```
 
 
 /opt/kafka/bin/kafka-topics.sh --create --topic search-index-0 --partitions 50 --replication-factor 1 --bootstrap-server kafka-1:9092
