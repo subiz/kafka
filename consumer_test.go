@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -198,7 +199,7 @@ func TestConsumerNormal(t *testing.T) {
 	handlerf, statf := NewTestHandler()
 	closechan := make(chan bool, 1)
 	go func() {
-		if err := Consume(testbroker, "consumer1", topic, func(partition int32, offset int64, data []byte, key string) {
+		if err := Consume(testbroker, "consumer1", topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
 			job := &TestJob{}
 			json.Unmarshal(data, job)
 			handlerf(key, job)
@@ -273,7 +274,7 @@ func TestConsumerCrashingConsumer(t *testing.T) {
 
 	go func() {
 		for !done {
-			if err := Consume(testbroker, consumergroup, topic, func(partition int32, offset int64, data []byte, key string) {
+			if err := Consume(testbroker, consumergroup, topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
 				lock.Lock()
 				recv++
 				lock.Unlock()

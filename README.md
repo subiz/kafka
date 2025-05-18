@@ -282,8 +282,6 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
-
-
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-0 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-1 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-2 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
@@ -335,3 +333,14 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-6 --alter --add-config retention.ms=86400000
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-7 --alter --add-config retention.ms=86400000
 /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-8 --alter --add-config retention.ms=86400000
+
+
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-8
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-7
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-6
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-5
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-4
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-3
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-2
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-1
+./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-0

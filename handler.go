@@ -15,6 +15,8 @@ import (
 
 // var hostname string // search-n
 type HandlerFunc func(partition int32, offset int64, data []byte, key string)
+type HandlerFuncCtx func(ctx context.Context, partition int32, offset int64, data []byte, key string)
+
 type PartitionHandlerFunc func(offset int64, data []byte)
 
 var g_consumer_group_session_lock = &sync.Mutex{}
