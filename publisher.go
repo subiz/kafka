@@ -97,7 +97,7 @@ func prepareMsg(topic string, data interface{}, par int32, key string) *sarama.P
 	}
 }
 
-func Publish(broker string, topic string, data interface{}, keys ...string) {
+func Publish(broker string, topic string, data interface{}, keys ...string) (int32, int64) {
 	var key string
 	if len(keys) > 0 {
 		key = keys[0]
@@ -105,20 +105,21 @@ func Publish(broker string, topic string, data interface{}, keys ...string) {
 		// random
 		key = strconv.Itoa(int(time.Now().UnixNano()))
 	}
-	PublishToPartition(broker, topic, data, -1, key)
+	return PublishToPartition(broker, topic, data, -1, key)
 }
 
-func PublishToPartition(broker, topic string, data interface{}, par int32, key string) {
+func PublishToPartition(broker, topic string, data interface{}, par int32, key string) (int32, int64) {
 	prod := prepareProducer(broker, int(par))
 	msg := prepareMsg(topic, data, par, key)
 	if msg == nil {
 		log.Println("no publish")
-		return
+		return -1, -1
 	}
+
 	for i := 0; i < 10; i++ {
-		_, _, err := prod.SendMessage(msg)
+		partition, offset, err := prod.SendMessage(msg)
 		if err == nil {
-			break
+			return partition, offset
 		}
 
 		d := fmt.Sprintf("%v", data)
@@ -134,4 +135,5 @@ func PublishToPartition(broker, topic string, data interface{}, par int32, key s
 		log.Println("retrying after 5sec")
 		time.Sleep(5 * time.Second)
 	}
+	return -1, -1
 }

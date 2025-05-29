@@ -26,7 +26,7 @@ type CommitOffset struct {
 }
 
 func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, closechan chan bool) error {
-	commitchan := make( chan CommitOffset, 20)
+	commitchan := make(chan CommitOffset, 20)
 	return ConsumeAsync(broker, consumerGroup, topic, func(ctx context.Context, partition int32, offset int64, data []byte, key string) {
 		handleFunc(ctx, partition, offset, data, key)
 		commitchan <- CommitOffset{Partition: partition, Offset: offset}
