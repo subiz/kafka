@@ -20,7 +20,20 @@ import (
 // timeout 5 min
 var HandlerTimeout = 5 * time.Minute
 
+type CommitOffset struct {
+	Partition int32
+	Offset    int64
+}
+
 func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, closechan chan bool) error {
+	commitchan := make( chan CommitOffset, 20)
+	return ConsumeAsync(broker, consumerGroup, topic, func(ctx context.Context, partition int32, offset int64, data []byte, key string) {
+		handleFunc(ctx, partition, offset, data, key)
+		commitchan <- CommitOffset{Partition: partition, Offset: offset}
+	}, closechan, commitchan)
+}
+
+func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, closechan chan bool, commitchan chan CommitOffset) error {
 	dead := false
 
 	if topic == "" {
@@ -84,13 +97,6 @@ func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, clo
 			log.Info("subiz", "KAFKATIMEOUT", topic, message.Partition, message.Offset, hexStr, key)
 			log.Track(ctx, "kafka_timeout", "topic", topic, "parittion", message.Partition, "offset", message.Offset, "data", hexStr, "key", key)
 		}
-
-		commitoffset := sq.Mark(message.Offset)
-		lock.Lock()
-		markBuffer := markBuffers[int(message.Partition)]
-		markBuffer = append(markBuffer, message.Offset)
-		commitOffsets[int(message.Partition)] = commitoffset
-		lock.Unlock()
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -136,6 +142,22 @@ func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, clo
 			squashers[i].Mark(offset)
 		}
 	}
+
+	go func() {
+		for co := range commitchan {
+			if dead {
+				return
+			}
+
+			sq := squashers[int(co.Partition)]
+			commitoffset := sq.Mark(co.Offset)
+			lock.Lock()
+			markBuffer := markBuffers[int(co.Partition)]
+			markBuffer = append(markBuffer, co.Offset)
+			commitOffsets[int(co.Partition)] = commitoffset
+			lock.Unlock()
+		}
+	}()
 
 	go func() {
 		for {
