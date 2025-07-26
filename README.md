@@ -310,6 +310,8 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 
 
 
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic tracking-events --partitions 1 --replication-factor 1 --bootstrap-server kafkaatm:9092
+
 
 ### Create topics in kafkaatm
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-0 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092

@@ -69,33 +69,35 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	lock := &sync.Mutex{}
 	markBuffers := make([][]int64, NPartition)
 
-	queue := executor.New(func(key string, payload any) {
+	queue := executor.New(func(key string, payloads []any) {
 		if dead {
 			return
 		}
-		message := payload.(*sarama.ConsumerMessage)
-		sq := squashers[int(message.Partition)]
-		counter.Incr(1)
+		for _, payload := range payloads {
+			message := payload.(*sarama.ConsumerMessage)
+			sq := squashers[int(message.Partition)]
+			counter.Incr(1)
 
-		// already consumed
-		if sq.Check(message.Offset) {
-			return
-		}
+			// already consumed
+			if sq.Check(message.Offset) {
+				continue
+			}
 
-		ctx, cancel := context.WithTimeout(context.Background(), HandlerTimeout)
-		defer cancel() // Always cancel to release resources
+			ctx, cancel := context.WithTimeout(context.Background(), HandlerTimeout)
+			defer cancel() // Always cancel to release resources
 
-		donec := make(chan bool, 1)
-		go func() {
-			handleFunc(ctx, message.Partition, message.Offset, message.Value, key)
-			donec <- true
-		}()
-		select {
-		case <-donec:
-		case <-time.After(HandlerTimeout):
-			hexStr := hex.EncodeToString(message.Value)
-			log.Info("subiz", "KAFKATIMEOUT", topic, message.Partition, message.Offset, hexStr, key)
-			log.Track(ctx, "kafka_timeout", "topic", topic, "parittion", message.Partition, "offset", message.Offset, "data", hexStr, "key", key)
+			donec := make(chan bool, 1)
+			go func() {
+				handleFunc(ctx, message.Partition, message.Offset, message.Value, key)
+				donec <- true
+			}()
+			select {
+			case <-donec:
+			case <-time.After(HandlerTimeout):
+				hexStr := hex.EncodeToString(message.Value)
+				log.Info("subiz", "KAFKATIMEOUT", topic, message.Partition, message.Offset, hexStr, key)
+				log.Track(ctx, "kafka_timeout", "topic", topic, "parittion", message.Partition, "offset", message.Offset, "data", hexStr, "key", key)
+			}
 		}
 	})
 
