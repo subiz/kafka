@@ -12,7 +12,6 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/subiz/executor/v2"
-	"github.com/subiz/header"
 	"github.com/subiz/log"
 	"github.com/subiz/squasher/v2"
 )
@@ -25,19 +24,47 @@ type CommitOffset struct {
 	Offset    int64
 }
 
-func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, closechan chan bool) error {
-	commitchan := make(chan CommitOffset, 20)
-	return ConsumeAsync(broker, consumerGroup, topic, func(ctx context.Context, partition int32, offset int64, data []byte, key string) {
+func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx) (*Consumer, error) {
+	var consumer *Consumer
+	var err error
+	consumer, err = ConsumeAsync(broker, consumerGroup, topic, func(ctx context.Context, partition int32, offset int64, data []byte, key string) {
 		handleFunc(ctx, partition, offset, data, key)
-		commitchan <- CommitOffset{Partition: partition, Offset: offset}
-	}, closechan, commitchan)
+		consumer.Commit(partition, offset)
+	})
+	return consumer, err
 }
 
-func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx, closechan chan bool, commitchan chan CommitOffset) error {
+type Consumer struct {
+	commitchan chan CommitOffset
+	closechan  chan bool
+}
+
+func (me *Consumer) Commit(partition int32, offset int64) {
+	me.commitchan <- CommitOffset{Partition: partition, Offset: offset}
+}
+
+func (me *Consumer) Close() {
+	me.closechan <- true
+}
+
+func (me *Consumer) CloseAsync() {
+	select {
+	case me.closechan <- true:
+	default:
+	}
+}
+
+func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx) (*Consumer, error) {
+	mainconsumer := &Consumer{}
 	dead := false
+	closechan := make(chan bool, 2)
+	mainconsumer.closechan = closechan
+
+	commitchan := make(chan CommitOffset, 1000)
+	mainconsumer.commitchan = commitchan
 
 	if topic == "" {
-		return log.EMissingId("topic")
+		return nil, log.EMissingId("topic")
 	}
 	config := sarama.NewConfig()
 	config.Version = sarama.V3_3_1_0
@@ -48,11 +75,11 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	// 1. find number of partitions
 	pclient, err := sarama.NewClient([]string{broker}, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	partitions, err := pclient.Partitions(topic)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	pclient.Close()
 
@@ -62,12 +89,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	commitOffsets := make([]int64, NPartition)
 	counter := ratecounter.NewRateCounter(1 * time.Minute)
 
-	// 2. connect to the marker
-	conn := header.DialGrpc("marker-0.marker:17695", header.WithShardRedirect())
-	marker := header.NewMarkerClient(conn)
-
 	lock := &sync.Mutex{}
-	markBuffers := make([][]int64, NPartition)
 
 	queue := executor.New(func(key string, payloads []any) {
 		if dead {
@@ -115,7 +137,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	client, err := sarama.NewConsumerGroup([]string{broker}, consumerGroup, config)
 	if err != nil {
 		cancel()
-		return err
+		return nil, err
 	}
 
 	go func() {
@@ -135,16 +157,6 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 		}
 	}()
 
-	for i := range NPartition {
-		state, err := marker.ListMarkers(context.Background(), &header.MarkRequest{Topic: topic, Partition: int32(i)})
-		if err != nil {
-			log.Err("subiz", err)
-		}
-		for _, offset := range state.GetOffsets() {
-			squashers[i].Mark(offset)
-		}
-	}
-
 	go func() {
 		for co := range commitchan {
 			if dead {
@@ -154,55 +166,42 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 			sq := squashers[int(co.Partition)]
 			commitoffset := sq.Mark(co.Offset)
 			lock.Lock()
-			markBuffer := markBuffers[int(co.Partition)]
-			markBuffer = append(markBuffer, co.Offset)
 			commitOffsets[int(co.Partition)] = commitoffset
 			lock.Unlock()
 		}
 	}()
 
 	go func() {
-		for {
-			time.Sleep(5 * time.Second)
-			if dead {
-				return
-			}
-
+		for !dead {
+			time.Sleep(3 * time.Second)
 			lock.Lock()
 			mycommitOffsets := commitOffsets
 			commitOffsets = make([]int64, NPartition)
 			lock.Unlock()
 
-			log.Info("subiz", "KAFKA RATE", topic, counter.Rate())
+			log.Info("subiz", "KAFKARATE", topic, counter.Rate()/60, "msg/sec")
 			for partition, offset := range mycommitOffsets {
-				// mark
-				lock.Lock()
-				markBuffer := markBuffers[partition]
-				markBuffers[partition] = []int64{}
-				lock.Unlock()
-
-				marker.Mark(context.Background(), &header.MarkRequest{Topic: topic, Partition: int32(partition), Offsets: markBuffer})
 				if lastCommitOffsets[partition] == offset {
 					continue
 				}
-
 				con.MarkOffset(topic, int32(partition), offset)
 				lastCommitOffsets[partition] = offset
-
-				marker.Commit(context.Background(), &header.CommitRequest{Topic: topic, Partition: int32(partition), Offset: offset})
 			}
 		}
 	}()
 
-	sigterm := make(chan os.Signal, 1)
-	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case <-sigterm:
-	case <-closechan:
-	}
-	dead = true
-	cancel()
-	return client.Close()
+	go func() {
+		sigterm := make(chan os.Signal, 1)
+		signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case <-sigterm:
+		case <-closechan:
+		}
+		dead = true
+		cancel()
+		client.Close()
+	}()
+	return mainconsumer, nil
 }
 
 // Consumer represents a Sarama consumer group consumer

@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
-	"os/signal"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -92,31 +89,14 @@ func NewJobGenerator(idprefix string, totalJobs, totalKeys int) chan *TestJob {
 	return ch
 }
 
-func SetupConsumerTest() (string, chan bool) {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		os.Exit(1)
-	}()
-
+func SetupConsumerTest() string {
 	topic := fmt.Sprintf("testtopic-%d", time.Now().UnixNano()) // see ./setuptest.sh
-
 	output, err := exec.Command("/bin/bash", "./setuptest.sh", topic).CombinedOutput()
 	if err != nil {
 		fmt.Println("OUT", string(output))
 		panic(err)
 	}
-	markerServer := NewMarkerServer()
-	go markerServer.Serve()
-	closechan := make(chan bool, 10)
-	go func() {
-		select {
-		case <-closechan:
-		}
-		markerServer.Shutdown()
-	}()
-	return topic, closechan
+	return topic
 }
 
 func makeSureConsumedAllMessages(t *testing.T, topic, consumergroup string) {
@@ -165,15 +145,16 @@ func makeSureConsumedAllMessages(t *testing.T, topic, consumergroup string) {
 		block := groupOffsets.GetBlock(topic, partition)
 		consumerOffsetM[partition] = block.Offset
 	}
+	time.Sleep(10 * time.Second)
 	for _, partition := range partitions {
 		if consumerOffsetM[partition] != latestOffsetM[partition] {
-			t.Errorf("MISSING OFFSET OF %d. Expect %d, got %d", partition, latestOffsetM[partition], consumerOffsetM[partition])
+			t.Errorf("MISSING OFFSET OF PARTITION %d. Expect %d, got %d", partition, latestOffsetM[partition], consumerOffsetM[partition])
 		}
 	}
 }
 
 func TestConsumerNormal(t *testing.T) {
-	topic, closec := SetupConsumerTest()
+	topic := SetupConsumerTest()
 	consumergroup := "consumer1"
 
 	var totalRandomJobs = 10000
@@ -197,13 +178,15 @@ func TestConsumerNormal(t *testing.T) {
 	}()
 
 	handlerf, statf := NewTestHandler()
-	closechan := make(chan bool, 1)
+	var consumer *Consumer
 	go func() {
-		if err := Consume(testbroker, "consumer1", topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
+		var err error
+		consumer, err = Consume(testbroker, "consumer1", topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
 			job := &TestJob{}
 			json.Unmarshal(data, job)
 			handlerf(key, job)
-		}, closechan); err != nil {
+		})
+		if err != nil {
 			panic(err)
 		}
 	}()
@@ -218,21 +201,13 @@ func TestConsumerNormal(t *testing.T) {
 		}
 	}
 
-	select {
-	case closechan <- true:
-	default:
-	}
-	select {
-	case closec <- true:
-	default:
-	}
-
+	consumer.CloseAsync()
 	makeSureConsumedAllMessages(t, topic, consumergroup)
 }
 
 func TestConsumerCrashingConsumer(t *testing.T) {
 	done := false
-	topic, closec := SetupConsumerTest()
+	topic := SetupConsumerTest()
 	consumergroup := "consumer1"
 	var totalRandomJobs = 10_000
 	var totalHotJobs = 200
@@ -262,26 +237,28 @@ func TestConsumerCrashingConsumer(t *testing.T) {
 	}()
 
 	handlerf, statf := NewTestHandler()
-	closechan := make(chan bool)
 	recv := 0
 
+	var consumer *Consumer
 	go func() {
 		for !done {
 			time.Sleep(22 * time.Second)
-			closechan <- true
+			consumer.CloseAsync()
 		}
 	}()
 
 	go func() {
 		for !done {
-			if err := Consume(testbroker, consumergroup, topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
+			var err error
+			consumer, err = Consume(testbroker, consumergroup, topic, func(_ context.Context, partition int32, offset int64, data []byte, key string) {
 				lock.Lock()
 				recv++
 				lock.Unlock()
 				job := &TestJob{}
 				json.Unmarshal(data, job)
 				handlerf(key, job)
-			}, closechan); err != nil {
+			})
+			if err != nil {
 				panic(err)
 			}
 			fmt.Println("CRASHED", "RESTART IN 10sec...")
@@ -298,17 +275,7 @@ func TestConsumerCrashingConsumer(t *testing.T) {
 			break                        // done
 		}
 	}
-
-	select {
-	case closechan <- true:
-	default:
-	}
-	select {
-	case closec <- true:
-	default:
-	}
-
+	consumer.CloseAsync()
 	done = true
-
 	makeSureConsumedAllMessages(t, topic, consumergroup)
 }
