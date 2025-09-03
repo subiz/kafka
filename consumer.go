@@ -103,8 +103,12 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 		block := groupOffsets.GetBlock(topic, partition)
 		sq := squasher.NewSquasher()
 		squashers[partition] = sq
-		sq.Init(block.Offset)
-		sq.Mark(block.Offset)
+		offset := block.Offset
+		// offset will point the the next message will receive (super confuse)
+		if offset < 0 { // except for the very first msg
+			offset = 0
+		}
+		sq.Init(offset)
 	}
 
 	lastCommitOffsets := make([]int64, NPartition)
