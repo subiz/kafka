@@ -16,6 +16,13 @@ import (
 	"github.com/subiz/squasher/v2"
 )
 
+// var hostname string // search-n
+type HandlerFunc func(partition int32, offset int64, data []byte, key string)
+type HandlerFuncCtx func(ctx context.Context, partition int32, offset int64, data []byte, key string)
+
+type PartitionHandlerFunc func(offset int64, data []byte)
+
+
 type CommitOffset struct {
 	Partition int32
 	Offset    int64
@@ -104,6 +111,13 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 		sq := squasher.NewSquasher()
 		squashers[partition] = sq
 		offset := block.Offset
+		// when the queue is empty
+		// + this offset will be -1
+		// + first message will be 0
+		// when the queue is not empty
+		// + this offset will be n
+		// + first message will be n
+
 		// offset will point the the next message will receive (super confuse)
 		if offset < 0 { // except for the very first msg
 			offset = 0
