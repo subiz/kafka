@@ -145,7 +145,7 @@ func makeSureConsumedAllMessages(t *testing.T, topic, consumergroup string) {
 		block := groupOffsets.GetBlock(topic, partition)
 		consumerOffsetM[partition] = block.Offset
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(20 * time.Second)
 	for _, partition := range partitions {
 		if consumerOffsetM[partition] != latestOffsetM[partition] {
 			t.Errorf("MISSING OFFSET OF PARTITION %d. Expect %d, got %d", partition, latestOffsetM[partition], consumerOffsetM[partition])

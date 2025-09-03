@@ -326,16 +326,27 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafkaatm:9092
 
 
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-0 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-1 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-2 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-3 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-4 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-5 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-6 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-7 --alter --add-config retention.ms=86400000
-/opt/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-8 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-0 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-1 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-2 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-3 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-4 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-5 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-6 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-7 --alter --add-config retention.ms=86400000
+/opt/bitnami/kafka/bin/kafka-configs.sh --bootstrap-server kafkaatm:9092 --entity-type topics --entity-name workflow-event-8 --alter --add-config retention.ms=86400000
 
+
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-0 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-1 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-2 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-3 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-4 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-5 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-6 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-7 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --create --topic workflow-action-8 --partitions 8 --replication-factor 1 --bootstrap-server kafkaatm:9092
+/opt/bitnami/kafka/bin/kafka-topics.sh --list --bootstrap-server kafkaatm:9092
 
 ./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-8
 ./kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group automation-7

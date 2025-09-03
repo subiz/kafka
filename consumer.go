@@ -2,9 +2,9 @@ package kafka
 
 import (
 	"context"
-	"encoding/hex"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -15,9 +15,6 @@ import (
 	"github.com/subiz/log"
 	"github.com/subiz/squasher/v2"
 )
-
-// timeout 5 min
-var HandlerTimeout = 5 * time.Minute
 
 type CommitOffset struct {
 	Partition int32
@@ -35,6 +32,7 @@ func Consume(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx) (*C
 }
 
 type Consumer struct {
+	topic      string
 	commitchan chan CommitOffset
 	closechan  chan bool
 }
@@ -55,7 +53,7 @@ func (me *Consumer) CloseAsync() {
 }
 
 func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx) (*Consumer, error) {
-	mainconsumer := &Consumer{}
+	mainconsumer := &Consumer{topic: topic}
 	dead := false
 	closechan := make(chan bool, 2)
 	mainconsumer.closechan = closechan
@@ -71,6 +69,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRoundRobin()}
 	//  config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Admin.Timeout = 10 * time.Second
 
 	// 1. find number of partitions
 	pclient, err := sarama.NewClient([]string{broker}, config)
@@ -83,18 +82,64 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	}
 	pclient.Close()
 
-	var NPartition = len(partitions)
+	// Build map[topic][]partition for the admin call
+	topicParts := map[string][]int32{topic: partitions}
+
+	admin, err := sarama.NewClusterAdmin([]string{broker}, config)
+	if err != nil {
+		return nil, err
+	}
+	defer admin.Close()
+
+	NPartition := len(partitions)
 	squashers := make([]*squasher.Squasher, NPartition)
+
+	groupOffsets, err := admin.ListConsumerGroupOffsets(consumerGroup, topicParts)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, partition := range partitions {
+		block := groupOffsets.GetBlock(topic, partition)
+		sq := squasher.NewSquasher()
+		squashers[partition] = sq
+		sq.Init(block.Offset)
+		sq.Mark(block.Offset)
+	}
+
 	lastCommitOffsets := make([]int64, NPartition)
 	commitOffsets := make([]int64, NPartition)
 	counter := ratecounter.NewRateCounter(1 * time.Minute)
 
 	lock := &sync.Mutex{}
+	_slowTrackM := map[string]int64{}
+	go func() {
+		for !dead {
+			time.Sleep(5 * time.Minute)
+			now := time.Now().UnixMilli()
+			slowM := map[string]int64{}
+			lock.Lock()
+			slowTrackM := map[string]int64{}
+			for k, created := range _slowTrackM {
+				if now-created > 300_000 {
+					slowM[k] = now - created
+					continue
+				}
+				slowTrackM[k] = created
+			}
+			_slowTrackM = slowTrackM
+			lock.Unlock()
+			for k, dur := range slowM {
+				log.Track(context.Background(), "slow-kafka", "topic", topic, "consumer-group", consumerGroup, "partition.offset", k, "sec", dur/1000)
+			}
+		}
+	}()
 
 	queue := executor.New(func(key string, payloads []any) {
 		if dead {
 			return
 		}
+
 		for _, payload := range payloads {
 			message := payload.(*sarama.ConsumerMessage)
 			sq := squashers[int(message.Partition)]
@@ -104,36 +149,24 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 			if sq.Check(message.Offset) {
 				continue
 			}
+			now := time.Now().UnixMilli()
+			pk := strconv.Itoa(int(message.Partition)) + "." + strconv.Itoa(int(message.Offset))
+			lock.Lock()
+			_slowTrackM[pk] = now
+			lock.Unlock()
+			// fmt.Println("GOT", pk)
 
-			ctx, cancel := context.WithTimeout(context.Background(), HandlerTimeout)
-			defer cancel() // Always cancel to release resources
+			handleFunc(context.Background(), message.Partition, message.Offset, message.Value, key)
 
-			donec := make(chan bool, 1)
-			go func() {
-				handleFunc(ctx, message.Partition, message.Offset, message.Value, key)
-				donec <- true
-			}()
-			select {
-			case <-donec:
-			case <-time.After(HandlerTimeout):
-				hexStr := hex.EncodeToString(message.Value)
-				log.Info("subiz", "KAFKATIMEOUT", topic, message.Partition, message.Offset, hexStr, key)
-				log.Track(ctx, "kafka_timeout", "topic", topic, "parittion", message.Partition, "offset", message.Offset, "data", hexStr, "key", key)
-			}
+			lock.Lock()
+			delete(_slowTrackM, pk)
+			lock.Unlock()
 		}
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	con := newConsumer2(func(key string, data any) {
-		message := data.(*sarama.ConsumerMessage)
-		sq := squashers[int(message.Partition)]
-		if sq == nil {
-			sq = squasher.NewSquasher()
-			squashers[message.Partition] = sq
-			sq.Init(message.Offset)
-		}
-		queue.Add(key, data)
-	})
+	con := newConsumer2(queue.Add)
+
 	client, err := sarama.NewConsumerGroup([]string{broker}, consumerGroup, config)
 	if err != nil {
 		cancel()
@@ -174,16 +207,20 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	go func() {
 		for !dead {
 			time.Sleep(3 * time.Second)
+			if con.session == nil {
+				continue
+			}
 			lock.Lock()
 			mycommitOffsets := commitOffsets
 			commitOffsets = make([]int64, NPartition)
 			lock.Unlock()
 
-			log.Info("subiz", "KAFKARATE", topic, counter.Rate()/60, "msg/sec")
+			log.Info("subiz", "KAFKARATE", topic, counter.Rate(), "msg/sec")
 			for partition, offset := range mycommitOffsets {
-				if lastCommitOffsets[partition] == offset {
+				if lastCommitOffsets[partition] >= offset {
 					continue
 				}
+				// fmt.Println("MARKED", topic, int32(partition), offset)
 				con.MarkOffset(topic, int32(partition), offset)
 				lastCommitOffsets[partition] = offset
 			}
@@ -195,11 +232,15 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 		signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 		select {
 		case <-sigterm:
+			dead = true
+			cancel()
+			client.Close()
+			panic("FORCEEXIT")
 		case <-closechan:
+			dead = true
+			cancel()
+			client.Close()
 		}
-		dead = true
-		cancel()
-		client.Close()
 	}()
 	return mainconsumer, nil
 }
@@ -235,9 +276,7 @@ func (me *consumer2) ConsumeClaim(session sarama.ConsumerGroupSession, claim sar
 			if !more {
 				return nil
 			}
-			if message != nil {
-				me.handler(string(message.Key), message)
-			}
+			me.handler(string(message.Key), message)
 		// Should return when `session.Context()` is done.
 		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
 		// https://github.com/Shopify/sarama/issues/1192
