@@ -130,39 +130,46 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	config.Admin.Timeout = 10 * time.Second
 
-	// 1. find number of partitions
 	pclient, err := sarama.NewClient([]string{broker}, config)
 	if err != nil {
 		return nil, err
 	}
 	partitions, err := pclient.Partitions(topic)
 	if err != nil {
+		pclient.Close()
 		return nil, err
 	}
-	defer pclient.Close()
 
 	// Build map[topic][]partition for the admin call
 	topicParts := map[string][]int32{topic: partitions}
 
 	admin, err := sarama.NewClusterAdmin([]string{broker}, config)
 	if err != nil {
+		pclient.Close()
 		return nil, err
 	}
-	defer admin.Close()
 
 	NPartition := len(partitions)
 	squashers := make([]*squasher.Squasher, NPartition)
 
 	groupOffsets, err := admin.ListConsumerGroupOffsets(consumerGroup, topicParts)
 	if err != nil {
+		pclient.Close()
+		admin.Close()
 		return nil, err
 	}
 
 	for _, partition := range partitions {
 		block := groupOffsets.GetBlock(topic, partition)
+
+		// Get earliest (first available) offset
+		earliest, _ := pclient.GetOffset(topic, partition, sarama.OffsetOldest)
 		sq := squasher.NewSquasher()
 		squashers[partition] = sq
 		offset := block.Offset
+		if offset < earliest {
+			offset = earliest
+		}
 		// when the queue is empty
 		// + this offset will be -1
 		// + first message will be 0
@@ -186,11 +193,10 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	go func() {
 		for !dead {
 			time.Sleep(5 * time.Minute)
-			lag, _ := getConsumerGroupLag(pclient, admin, broker, consumerGroup, topic)
-			if lag > 50_000 {
-				log.Track(context.Background(), "kafka-lag", "topic", topic, "consumer-group", consumerGroup, "lag", lag)
+			lag, err := getConsumerGroupLag(pclient, admin, broker, consumerGroup, topic)
+			if lag > 50_000 || err != nil {
+				log.Track(context.Background(), "kafka-lag", "topic", topic, "consumer-group", consumerGroup, "lag", lag, "err", err)
 			}
-
 			now := time.Now().UnixMilli()
 			slowM := map[string]int64{}
 			lock.Lock()
@@ -229,10 +235,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 			lock.Lock()
 			_slowTrackM[pk] = now
 			lock.Unlock()
-			// fmt.Println("GOT", pk)
-
 			handleFunc(context.Background(), message.Partition, message.Offset, message.Value, key)
-
 			lock.Lock()
 			delete(_slowTrackM, pk)
 			lock.Unlock()
@@ -245,6 +248,8 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	client, err := sarama.NewConsumerGroup([]string{broker}, consumerGroup, config)
 	if err != nil {
 		cancel()
+		pclient.Close()
+		admin.Close()
 		return nil, err
 	}
 
@@ -295,7 +300,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 				if lastCommitOffsets[partition] >= offset {
 					continue
 				}
-				// fmt.Println("MARKED", topic, int32(partition), offset)
+				// fmt.Println("MARKED", consumerGroup, topic, int32(partition), offset)
 				con.MarkOffset(topic, int32(partition), offset)
 				lastCommitOffsets[partition] = offset
 			}
@@ -310,10 +315,15 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 			dead = true
 			cancel()
 			client.Close()
+			admin.Close()
+			pclient.Close()
+
 			panic("FORCEEXIT")
 		case <-closechan:
 			dead = true
 			cancel()
+			admin.Close()
+			pclient.Close()
 			client.Close()
 		}
 	}()
