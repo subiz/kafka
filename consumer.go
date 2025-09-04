@@ -22,7 +22,6 @@ type HandlerFuncCtx func(ctx context.Context, partition int32, offset int64, dat
 
 type PartitionHandlerFunc func(offset int64, data []byte)
 
-
 type CommitOffset struct {
 	Partition int32
 	Offset    int64
@@ -59,6 +58,59 @@ func (me *Consumer) CloseAsync() {
 	}
 }
 
+// return max number of uncommit kafka messages for all partitions in a topic
+func getConsumerGroupLag(client sarama.Client, admin sarama.ClusterAdmin, broker, consumerGroup, topic string) (int, error) {
+	partitions, err := client.Partitions(topic)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(partitions) == 0 {
+		return 0, nil
+	}
+
+	topicParts := map[string][]int32{topic: partitions}
+	groupOffsets, err := admin.ListConsumerGroupOffsets(consumerGroup, topicParts)
+	if err != nil {
+		return 0, err
+	}
+
+	maxLag := int64(0)
+	for _, partition := range partitions {
+		latestOffset, err := client.GetOffset(topic, partition, sarama.OffsetNewest)
+		if err != nil {
+			log.Err("subiz", err, "msg", "failed to get latest offset", "topic", topic, "partition", partition)
+			continue
+		}
+
+		block := groupOffsets.GetBlock(topic, partition)
+		groupOffset := block.Offset
+
+		var partitionLag int64
+		// when a consumer group is first created, the offset is -1
+		if groupOffset == -1 {
+			// lag is the total number of messages in the partition
+			oldestOffset, err := client.GetOffset(topic, partition, sarama.OffsetOldest)
+			if err != nil {
+				log.Err("subiz", err, "msg", "failed to get oldest offset", "topic", topic, "partition", partition)
+				continue
+			}
+			partitionLag = latestOffset - oldestOffset
+		} else {
+			partitionLag = latestOffset - groupOffset
+		}
+
+		if partitionLag < 0 {
+			partitionLag = 0
+		}
+		if partitionLag > maxLag {
+			maxLag = partitionLag
+		}
+	}
+
+	return int(maxLag), nil
+}
+
 func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx) (*Consumer, error) {
 	mainconsumer := &Consumer{topic: topic}
 	dead := false
@@ -87,7 +139,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	if err != nil {
 		return nil, err
 	}
-	pclient.Close()
+	defer pclient.Close()
 
 	// Build map[topic][]partition for the admin call
 	topicParts := map[string][]int32{topic: partitions}
@@ -134,6 +186,11 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFuncCtx
 	go func() {
 		for !dead {
 			time.Sleep(5 * time.Minute)
+			lag, _ := getConsumerGroupLag(pclient, admin, broker, consumerGroup, topic)
+			if lag > 50_000 {
+				log.Track(context.Background(), "kafka-lag", "topic", topic, "consumer-group", consumerGroup, "lag", lag)
+			}
+
 			now := time.Now().UnixMilli()
 			slowM := map[string]int64{}
 			lock.Lock()
