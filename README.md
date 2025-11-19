@@ -282,6 +282,11 @@ $ /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --de
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic zalo-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
 
+/opt/kafka/bin/kafka-topics.sh --create --topic zaloperson-0 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic zaloperson-1 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic zaloperson-2 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+/opt/kafka/bin/kafka-topics.sh --create --topic zaloperson-3 --partitions 4 --replication-factor 1 --bootstrap-server kafka-1:9092
+
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-0 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-1 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092
 /opt/kafka/bin/kafka-topics.sh --create --topic workflow-event-2 --partitions 8 --replication-factor 1 --bootstrap-server kafka-1:9092

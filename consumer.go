@@ -289,7 +289,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFunc) (
 					log.Track(context.Background(), "slow-kafka", "topic", topic, "consumer-group", consumerGroup, "partition.offset", k, "sec", dur/1000)
 				}
 
-				log.Info("subiz", "KAFKARATE", topic, counter.Rate(), "msg/sec")
+				// log.Info("subiz", "KAFKARATE", topic, counter.Rate(), "msg/sec")
 				for partition, offset := range mycommitOffsets {
 					if lastCommitOffsets[partition] >= offset {
 						continue
