@@ -141,7 +141,7 @@ func ConsumeAsync(broker, consumerGroup, topic string, handleFunc HandlerFunc) (
 	mainconsumer.commitchan = commitchan
 
 	if topic == "" {
-		return nil, log.EMissingId("topic")
+		return nil, log.EMissingId(context.Background(), "topic")
 	}
 	config := sarama.NewConfig()
 	config.Version = sarama.V3_3_1_0
